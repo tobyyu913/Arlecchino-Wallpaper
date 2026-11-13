@@ -13,6 +13,7 @@ final class WallpaperSurface: NSView {
         layer?.backgroundColor = NSColor.black.cgColor
         layer?.masksToBounds = true
         videoLayer.videoGravity = .resize
+        videoLayer.actions = ["opacity": NSNull(), "position": NSNull(), "bounds": NSNull()]
         layer?.addSublayer(videoLayer)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -42,6 +43,9 @@ final class WallpaperWindow: NSWindow {
         level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.desktopWindow)) + 1)
         collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
         ignoresMouseEvents = true
+        canHide = false
+        hidesOnDeactivate = false
+        animationBehavior = .none
         isReleasedWhenClosed = false
         backgroundColor = .black
         surface.aspectRatio = aspectRatio
@@ -49,6 +53,12 @@ final class WallpaperWindow: NSWindow {
         contentView = surface
         surface.needsLayout = true
         orderFrontRegardless()
+    }
+    func update(screen: NSScreen, aspectRatio: CGFloat) {
+        if frame != screen.frame { setFrame(screen.frame, display: true) }
+        if surface.aspectRatio != aspectRatio { surface.aspectRatio = aspectRatio; surface.needsLayout = true }
+        if videoLayer.contentsScale != screen.backingScaleFactor { surface.needsLayout = true }
+        surface.layoutSubtreeIfNeeded()
     }
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
@@ -113,7 +123,8 @@ struct Preferences: View {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    var windows: [WallpaperWindow] = []
+    let windowRegistry = WindowRegistry<WallpaperWindow>()
+    var windows: [WallpaperWindow] { windowRegistry.windows }
     var player = AVQueuePlayer()
     var looper: AVPlayerLooper?
     var status: NSStatusItem!
@@ -193,10 +204,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         else { windows.forEach { $0.videoLayer.player = player } }
     }
     @objc func rebuildWindows() {
-        windows.forEach { $0.close() }
-        windows = NSScreen.screens.map { WallpaperWindow(screen: $0, player: player, aspectRatio: videoAspectRatio) }
-        windows.forEach { $0.videoLayer.opacity = locked ? 0 : 1 }
-        if !test { applyLockBackground() }
+        let screens = NSScreen.screens
+        var byID: [String: NSScreen] = [:]
+        let ids = screens.map { screen -> String in
+            let id = displayKey(screen)
+            byID[id] = screen
+            return id
+        }
+        let previousIDs = windowRegistry.displayIDs
+        windowRegistry.reconcile(displayIDs: ids, create: { id in
+            let window = WallpaperWindow(screen: byID[id]!, player: player, aspectRatio: videoAspectRatio)
+            window.videoLayer.opacity = locked ? 0 : 1
+            return window
+        }, update: { id, window in
+            window.update(screen: byID[id]!, aspectRatio: videoAspectRatio)
+        }, remove: { $0.close() })
+        // App/Space changes can emit redundant screen notifications. They must
+        // neither replace the video layer nor rewrite the underlying wallpaper.
+        if !test && !Set(ids).subtracting(previousIDs).isEmpty { applyLockBackground() }
     }
     func updateDisplayLayout() {
         windows.forEach { $0.surface.needsLayout = true; $0.surface.layoutSubtreeIfNeeded() }
@@ -236,6 +261,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         windows.forEach { $0.videoLayer.opacity = 0 }
     }
     @objc func unlocked() {
+        // Both the session and screen-unlock notifications can describe one
+        // unlock. An already-active desktop is not a new opening trigger.
+        guard locked else { return }
         let wasLocked = locked
         locked = false
         windows.forEach { $0.videoLayer.opacity = 1 }

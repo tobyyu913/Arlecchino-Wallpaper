@@ -5,7 +5,7 @@ BUILD="$ROOT/work/build"
 APP="$ROOT/outputs/Arlecchino Wallpaper.app"
 mkdir -p "$BUILD" "$APP/Contents/MacOS" "$APP/Contents/Resources"
 for ARCH in arm64 x86_64; do
-    xcrun swiftc "$ROOT/Sources/DisplayLayout.swift" "$ROOT/Sources/main.swift" \
+    xcrun swiftc "$ROOT/Sources/DisplayLayout.swift" "$ROOT/Sources/WindowRegistry.swift" "$ROOT/Sources/main.swift" \
         -module-cache-path "$BUILD/ModuleCache" -target "$ARCH-apple-macosx14.0" \
         -framework AppKit -framework AVFoundation -framework SwiftUI -framework Carbon \
         -framework ServiceManagement -O -o "$BUILD/ArlecchinoWallpaper-$ARCH"
