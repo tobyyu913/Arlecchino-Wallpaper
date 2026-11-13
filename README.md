@@ -10,6 +10,12 @@ The curtain opens once on launch or your chosen wake/unlock event. Face and hair
 - Apple silicon or Intel Mac. The build produces a universal executable.
 - Xcode command-line tools to build from source. The installed app needs no development tools.
 
+## Download
+
+Download the **DMG** or zipped **.app** from the [latest release](https://github.com/tobyyu913/Arlecchino-Wallpaper/releases/latest). The DMG contains an Applications shortcut: drag the app onto it, eject the image, then open the app from Applications.
+
+Release builds are ad-hoc signed and are not Developer ID signed or notarized. If macOS blocks the downloaded app, review the app in **System Settings → Privacy & Security**; use **Open Anyway** only if you trust the release. SHA-256 checksums accompany each release.
+
 ## Build and install
 
 ```sh
@@ -38,6 +44,14 @@ The default layout scales the video to the display height and anchors its right 
 
 Bundled video assets are optimized to 1920 × 1082 at 60 fps and scale to the connected display; they are not native 4K renders.
 
+## Package a release
+
+```sh
+./scripts/package.sh
+```
+
+This builds both architectures and generates a compressed DMG, a zipped app, and `SHA256SUMS.txt` in `outputs/`.
+
 ## Verification
 
 ```sh
@@ -57,5 +71,6 @@ An optional `--self-test` application argument exercises real playback through o
 - `Resources/`: opening, seamless middle, closing, black image, and app metadata.
 - `Tests/`: display-layout checks.
 - `scripts/build.sh`: universal build and local signing.
+- `scripts/package.sh`: DMG, zipped app, and checksum packaging.
 
 The historical bundle identifier is retained so existing settings survive the rename. Video and character artwork remain the property of their respective rights holders; their inclusion does not grant redistribution rights.
