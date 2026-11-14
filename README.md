@@ -36,7 +36,7 @@ The app is locally ad-hoc signed. This repository does not include a Developer I
 - **Control–Option–Command–O:** open or replay the curtain.
 - **Open the curtain:** wake and unlock, unlock only, wake only, or manually.
 - **Screen layout:** preserve the full character at the right edge (default), fit the whole video, or fill the display with cropping.
-- **Lock-screen background:** black or the existing Mac wallpaper. Black mode changes the static wallpaper beneath the animated desktop layer and restores the previous image on quit. macOS controls the actual secure lock screen; its clock, authentication UI, screen saver, and pre-login/FileVault screen are not replaced by this app.
+- **Lock-screen background:** black or the existing Mac wallpaper. Black mode uses a matching, display-sized still of Arlecchino beneath the open animation so fullscreen-to-desktop Space transitions do not reveal an empty black desktop. It switches the backing to black when the curtain closes or the session locks, and restores the previous wallpaper on quit. Choosing Keep Mac wallpaper preserves your original system wallpaper instead. macOS controls the actual secure lock screen; its clock, authentication UI, screen saver, and pre-login/FileVault screen are not replaced by this app.
 
 When the session locks, video playback pauses and its desktop layer becomes black. Wake-triggered openings are deferred until unlock while the session is locked. The configured opening behavior then resumes.
 
@@ -66,6 +66,9 @@ work/tests/display-layout
 xcrun swiftc Sources/WindowRegistry.swift Tests/WindowRegistry/main.swift \
   -module-cache-path work/build/ModuleCache -o work/tests/window-registry
 work/tests/window-registry
+xcrun swiftc Sources/DisplayLayout.swift Sources/DesktopBacking.swift Tests/DesktopBacking/main.swift \
+  -module-cache-path work/build/ModuleCache -o work/tests/desktop-backing
+work/tests/desktop-backing
 ```
 
 Geometry checks cover 12 display sizes, three layout modes, negative/offset screen origins, character visibility, and aspect-ratio preservation. Window lifecycle checks verify that 100 redundant display events preserve the same window instances and cover monitor hot-plug, reordering, and removal. Physical display hot-plug and secure lock-screen behavior need testing on the target Mac.
