@@ -1,0 +1,3 @@
+Minimalist Monochrome Mac Icons by Aman Chokshi
+https://github.com/amanchokshi/minimalist-monochrome-mac-icons
+MIT License; original files downloaded from the master branch.

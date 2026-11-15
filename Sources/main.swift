@@ -93,6 +93,9 @@ final class WallpaperWindow: NSWindow {
 typealias StoredState<Value> = SwiftUI.State<Value>
 
 struct Preferences: View {
+    @AppStorage("launcherEnabled") var launcherEnabled = true
+    @AppStorage("launcherEdgeTrigger") var launcherEdgeTrigger = true
+    @AppStorage("launcherOriginalIcons") var launcherOriginalIcons = false
     @AppStorage("trigger") var trigger = "both"
     @AppStorage("lockBackground") var lockBackground = "black"
     @AppStorage("displayLayout") var displayLayout = "character"
@@ -104,6 +107,10 @@ struct Preferences: View {
             Text("Arlecchino Wallpaper").font(.largeTitle.bold())
             Text("Your own little theatre, behind the desktop.").foregroundStyle(.secondary)
             Divider()
+            Toggle("Show desktop launcher", isOn: $launcherEnabled).onChange(of: launcherEnabled) { appDelegate.launcher.rebuild(locked: appDelegate.locked) }
+            Toggle("Summon at the left screen edge", isOn: $launcherEdgeTrigger)
+            Toggle("Use original application icons", isOn: $launcherOriginalIcons).onChange(of: launcherOriginalIcons) { appDelegate.launcher.model.icons = launcherOriginalIcons }
+            Text("Right-click apps to edit favorites. Drag the alphabet to browse. Show / hide launcher: ⌃⌥⌘ L").font(.caption).foregroundStyle(.secondary)
             Picker("Open the curtain", selection: $trigger) {
                 Text("On wake and unlock").tag("both")
                 Text("On unlock").tag("unlock")
@@ -149,6 +156,7 @@ struct Preferences: View {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    let launcher = DesktopLauncher()
     let windowRegistry = WindowRegistry<WallpaperWindow>()
     var windows: [WallpaperWindow] { windowRegistry.windows }
     var player = AVQueuePlayer()
@@ -174,8 +182,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
-        UserDefaults.standard.register(defaults: ["trigger": "both", "closeKey": "q", "lockBackground": "black", "displayLayout": "character"])
+        UserDefaults.standard.register(defaults: ["trigger": "both", "closeKey": "q", "lockBackground": "black", "displayLayout": "character", "launcherEnabled": true, "launcherEdgeTrigger": true])
         buildMenu()
+        if !test { launcher.model.refresh(); launcher.rebuild(); launcher.startEdgeTrigger() }
         registerShortcuts()
         if !test { applyLockBackground() }
         let workspace = NSWorkspace.shared.notificationCenter
@@ -207,6 +216,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 ready = true
                 openCurtain()
                 if test { runTest() }
+                else if CommandLine.arguments.contains("--launcher-self-test") { runLauncherTest() }
                 else if !UserDefaults.standard.bool(forKey: "didSetup") { showPreferences(); UserDefaults.standard.set(true, forKey: "didSetup") }
             } catch {
                 let alert = NSAlert(); alert.messageText = "Cannot load curtain animation"; alert.informativeText = error.localizedDescription; alert.runModal(); NSApp.terminate(nil)
@@ -220,6 +230,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(withTitle: "Open curtain    ⌃⌥⌘O", action: #selector(openCurtain), keyEquivalent: "")
         menu.addItem(withTitle: "Close curtain", action: #selector(closeCurtain), keyEquivalent: "")
         menu.addItem(.separator())
+        menu.addItem(withTitle: "Show launcher    ⌃⌥⌘L", action: #selector(showLauncher), keyEquivalent: "")
         menu.addItem(withTitle: "Settings…", action: #selector(showPreferences), keyEquivalent: ",")
         menu.addItem(withTitle: "Quit Arlecchino Wallpaper", action: #selector(quit), keyEquivalent: "q")
         for item in menu.items { item.target = self }
@@ -263,6 +274,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }, remove: { $0.close() })
         // App/Space changes can emit redundant screen notifications. They must
         // neither replace the video layer nor rewrite the underlying wallpaper.
+        if !test {
+            if Set(ids) != Set(previousIDs) { launcher.rebuild(locked: locked) }
+            else { launcher.updateFrames() }
+        }
         if !test && !Set(ids).subtracting(previousIDs).isEmpty { applyLockBackground() }
     }
     func updateDisplayLayout() {
@@ -302,6 +317,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func screenWoke() { woke() }
     @objc func screenLocked() {
         locked = true
+        launcher.windows.forEach { $0.orderOut(nil) }
         player.pause()
         windows.forEach { $0.surface.setLocked(true) }
         if !test { applyLockBackground() }
@@ -312,6 +328,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard locked else { return }
         let wasLocked = locked
         locked = false
+        if !test { launcher.rebuild() }
         windows.forEach { $0.surface.setLocked(false) }
         let trigger = UserDefaults.standard.string(forKey: "trigger") ?? "both"
         if wasLocked && (trigger == "unlock" || trigger == "both" || (trigger == "wake" && pendingWakeOpening)) {
@@ -385,6 +402,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         UserDefaults.standard.set(saved, forKey: "previousWallpapers")
     }
     @objc func sleeping() { player.pause() }
+    @objc func showLauncher() { launcher.reveal() }
     @objc func quit() { NSApp.terminate(nil) }
     @objc func showPreferences() {
         if preferences == nil {
@@ -407,17 +425,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 guard let event else { return OSStatus(eventNotHandledErr) }
                 var id = EventHotKeyID()
                 GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil, MemoryLayout<EventHotKeyID>.size, nil, &id)
-                DispatchQueue.main.async { if id.id == 1 { appDelegate.closeCurtain() } else { appDelegate.openCurtain() } }
+                DispatchQueue.main.async { if id.id == 1 { appDelegate.closeCurtain() } else if id.id == 3 { appDelegate.launcher.toggle() } else { appDelegate.openCurtain() } }
                 return noErr
             }, 1, &spec, nil, &handler)
         }
         let key: UInt32
         switch UserDefaults.standard.string(forKey: "closeKey") { case "c": key = UInt32(kVK_ANSI_C); case "space": key = UInt32(kVK_Space); default: key = UInt32(kVK_ANSI_Q) }
-        for (number, code) in [(UInt32(1), key), (UInt32(2), UInt32(kVK_ANSI_O))] {
+        for (number, code) in [(UInt32(1), key), (UInt32(2), UInt32(kVK_ANSI_O)), (UInt32(3), UInt32(kVK_ANSI_L))] {
             var reference: EventHotKeyRef?
             let result = RegisterEventHotKey(code, UInt32(controlKey | optionKey | cmdKey), EventHotKeyID(signature: 0x43555254, id: number), GetApplicationEventTarget(), 0, &reference)
             if result == noErr, let reference { hotKeys.append(reference) }
             else { NSLog("Curtain shortcut registration failed: %d", result) }
+        }
+    }
+    func runLauncherTest() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [self] in
+            let model = launcher.model
+            let originalFavorites = model.favorites
+            let catalog = !model.apps.isEmpty && Set(model.apps.map(\.id)).count == model.apps.count
+            model.query = "Safari"
+            let search = model.visible.allSatisfy { $0.name.localizedCaseInsensitiveContains("Safari") } && !model.visible.isEmpty
+            model.query = ""
+            var favorite = false
+            if let app = model.apps.first {
+                let before = model.favorites.contains(app.id)
+                model.toggle(app)
+                favorite = model.favorites.contains(app.id) != before
+                model.toggle(app)
+                favorite = favorite && Set(model.favorites) == Set(originalFavorites)
+                model.favorites = originalFavorites; model.save()
+            }
+            model.section = "★"
+            let layout = launcher.windows.count == NSScreen.screens.count && launcher.windows.allSatisfy { $0.frame.height > 100 && $0.level.rawValue < NSWindow.Level.normal.rawValue }
+            if let view = launcher.windows.first?.contentView,
+               let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+                view.cacheDisplay(in: view.bounds, to: bitmap)
+                if let data = bitmap.representation(using: .png, properties: [:]),
+                   let path = ProcessInfo.processInfo.environment["LAUNCHER_PREVIEW"] { try? data.write(to: URL(fileURLWithPath: path)) }
+            }
+            let matchedIcons = model.apps.compactMap { model.minimalIconURL($0) }
+            let validIcons = !matchedIcons.isEmpty && matchedIcons.allSatisfy { NSImage(contentsOf: $0) != nil }
+            let result = "minimalIcons=\(matchedIcons.count) decoded=\(validIcons) catalog=\(catalog) count=\(model.apps.count) search=\(search) favorites=\(favorite) layout=\(layout) shortcuts=\(hotKeys.count) nativeScroll=\(launcher.windows.first?.contentView.flatMap { AlphabetInputView.listScrollView(in: $0) } != nil) window=\(launcher.windows.first?.windowNumber ?? 0)\n"
+            try? result.write(toFile: ProcessInfo.processInfo.environment["LAUNCHER_TEST_LOG"] ?? "/tmp/arlecchino-launcher-test.txt", atomically: true, encoding: .utf8)
         }
     }
     func runTest() {
@@ -433,7 +482,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             if elapsed > 21 && state == "open" { closeCurtain() }
             if elapsed > 25 {
-                let passed = observedMiddle && observedLoop && player.rate == 0 && player.currentTime().seconds > 2.8 && hotKeys.count == 2 && !windows.isEmpty && player.currentItem?.error == nil
+                let passed = observedMiddle && observedLoop && player.rate == 0 && player.currentTime().seconds > 2.8 && hotKeys.count == 3 && !windows.isEmpty && player.currentItem?.error == nil
                 let result = "playback=\(passed ? "PASS" : "FAIL") middle=\(observedMiddle) loopWrap=\(observedLoop) closingTime=\(player.currentTime().seconds) hotkeys=\(hotKeys.count) screens=\(windows.count)\n"
                 try? result.write(toFile: ProcessInfo.processInfo.environment["CURTAIN_TEST_LOG"] ?? "/tmp/curtain-test.txt", atomically: true, encoding: .utf8)
                 timer.invalidate(); NSApp.terminate(nil)
@@ -444,6 +493,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         showPreferences(); return true
     }
     func applicationWillTerminate(_ notification: Notification) {
+        launcher.stopEdgeTrigger()
         if !test { restoreWallpaper() }
         player.pause(); hotKeys.forEach { UnregisterEventHotKey($0) }
     }

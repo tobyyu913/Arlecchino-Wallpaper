@@ -4,7 +4,7 @@ Native Arlecchino curtain wallpapers for macOS and Android.
 
 **Android:** [download Arlecchino Home](https://github.com/tobyyu913/Arlecchino-Wallpaper/releases/tag/android-v1.9) or read the [Android instructions](android/README.md). The Android app now includes an original favorites-first launcher with a frame-driven alphabet wave, persistent search, bundled outline icons, app pop-ups/folders, and optional notification previews/replies, over the curtain wallpaper. The curtain opens once on screen-on, then holds the open frame; it has no middle loop or closing action. Earlier wallpaper-only builds remain in previous releases.
 
-The macOS version is a small native menu-bar app dedicated to the Arlecchino curtain animation.
+The macOS version combines the Arlecchino curtain animation with an optional favorites-first desktop launcher. Search installed applications, move the cursor over the alphabet to browse without clicking; the strip bends outward into its own right-hand gutter with an enlarged letter preview, leaving app rows clickable, or swipe with two fingers over the strip to scroll with native trackpad momentum, and right-click any app to add or remove a favorite. The launcher sits beneath normal windows on every connected display.
 
 The curtain opens once on launch or your chosen wake/unlock event. Face and hair movement continues in a forward/reverse loop that excludes the original video's closing frames. A global shortcut closes the curtain and leaves it shut.
 
@@ -34,6 +34,11 @@ The app is locally ad-hoc signed. This repository does not include a Developer I
 
 - **Control–Option–Command–Q:** close the curtain. Settings also offers C or Space as the final key.
 - **Control–Option–Command–O:** open or replay the curtain.
+- **Control–Option–Command–L:** toggle the launcher open or closed, with native Liquid Glass on macOS 26+ (translucent material on earlier systems). Returning to the desktop restores its dark background. Escape dismisses it; the shortcut brings it back. Selecting an app returns the launcher to the desktop layer.
+- **Left screen edge:** move the cursor to the extreme left edge of a display to summon the launcher on that display. Summoning and dismissal use short fade-and-slide transitions (a fade only with Reduce Motion). The summoned launcher dismisses when the pointer leaves it after entering, with a short grace period; menus and dragging pause dismissal. A brief dwell filters accidental crossings; leave the edge before triggering it again. Disable this in Settings if desired. No Accessibility or Input Monitoring permission is needed.
+- **Show desktop launcher:** enable or hide the launcher in Settings.
+- **Use original application icons:** switch between the downloaded [Minimalist Monochrome Mac Icons](https://github.com/amanchokshi/minimalist-monochrome-mac-icons) by Aman Chokshi (MIT) and original app icons. The downloaded pack uses app-specific designs; apps without a matching design retain their original icons. Pack source and license are bundled in `Resources/MinimalIcons/`.
+- Favorites are stored locally on this Mac and can be edited by right-clicking an app.
 - **Open the curtain:** wake and unlock, unlock only, wake only, or manually.
 - **Screen layout:** preserve the full character at the right edge (default), fit the whole video, or fill the display with cropping.
 - **Lock-screen background:** black or the existing Mac wallpaper. Black mode uses a matching, display-sized still of Arlecchino beneath the open animation so fullscreen-to-desktop Space transitions do not reveal an empty black desktop. It switches the backing to black when the curtain closes or the session locks, and restores the previous wallpaper on quit. Choosing Keep Mac wallpaper preserves your original system wallpaper instead. macOS controls the actual secure lock screen; its clock, authentication UI, screen saver, and pre-login/FileVault screen are not replaced by this app.
@@ -69,9 +74,15 @@ work/tests/window-registry
 xcrun swiftc Sources/DisplayLayout.swift Sources/DesktopBacking.swift Tests/DesktopBacking/main.swift \
   -module-cache-path work/build/ModuleCache -o work/tests/desktop-backing
 work/tests/desktop-backing
+xcrun swiftc Sources/Launcher.swift Tests/AlphabetInput/main.swift \
+  -module-cache-path work/build/ModuleCache -framework AppKit -framework SwiftUI \
+  -o work/tests/launcher-interactions
+work/tests/launcher-interactions
 ```
 
 Geometry checks cover 12 display sizes, three layout modes, negative/offset screen origins, character visibility, and aspect-ratio preservation. Window lifecycle checks verify that 100 redundant display events preserve the same window instances and cover monitor hot-plug, reordering, and removal. Physical display hot-plug and secure lock-screen behavior need testing on the target Mac.
+
+The `--launcher-self-test` argument verifies installed-app discovery, search, favorites round-trip, desktop window placement, and shortcut registration, writing `/tmp/arlecchino-launcher-test.txt`.
 
 An optional `--self-test` application argument exercises real playback through opening, a full middle-loop wrap, and closing, then writes a report to `/tmp/curtain-test.txt` and exits. It does not change wallpaper settings.
 
