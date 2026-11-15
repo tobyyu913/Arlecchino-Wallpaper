@@ -1568,18 +1568,30 @@ public final class HomeActivity extends Activity {
               Math.min(
                   letters.length() - 1, (smoothY - trackStart) / Math.max(1, trackStep) - .5f));
       int index = Math.round(focus);
-      if (dragging && index != selected) {
+      boolean sectionChanged = index != selected;
+      if (dragging && sectionChanged) {
         selected = index;
         performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK);
         announceForAccessibility(String.valueOf(letters.charAt(index)));
       }
       if (dragging) {
-        if (focus < .3f) {
-          hideGestureGroup(false);
-          if (all || searching) {
+        if (index == 0) {
+          if (sectionChanged || all || searching || previewIndex >= 0) {
+            // Snap while held. Repeated preview fades would restart each frame,
+            // leaving the favorites list invisible until the finger lifts.
+            previewTransition++;
+            previewIndex = -1;
+            gestureLayer.animate().cancel();
+            gestureLayer.setVisibility(View.GONE);
+            gestureLayer.setAlpha(1);
+            list.animate().cancel();
+            list.setAlpha(1);
             hideKeyboard();
             search.setText("");
             mode(false, false);
+            // Clear ListView's old all-apps scroll anchor after restoring its header.
+            list.setAdapter(adapter);
+            list.setSelectionFromTop(0, 0);
           }
         } else showGestureGroup(Math.max(1, index));
       }

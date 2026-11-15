@@ -112,3 +112,9 @@ Favorites migration used the checked rows in Niagara's edit-favorites screen, no
 The personal migration matched all 27 installed apps, including the explicit Phone launcher component and the correct app where two installed packages shared a label. All 27 favorites were then read back from Arlecchino's Home list in the same order after force-stop/relaunch. The temporary device-side import file is removed after verification.
 
 The horizontal-pull test exposed clipping at the old 170dp rail boundary. The visual rail now spans the full window while touch ownership remains restricted to the edge; this lets the wave follow an inward finger without clipping its pointer or blocking app-list gestures. The persistence test force-stopped the wallpaper package, which Android reported as clearing the live wallpaper (`SET_LIVE_TO_CLEAR`); the curtain wallpaper was restored to Home and Lock through the system picker afterward.
+
+## Held-star favorites snap: 1.7.1
+
+The star was drawn using rounded letter selection, but favorites activation used a narrower fractional threshold. In part of the star's hit region the UI therefore displayed a star while retaining the previous app group. Furthermore, the preview fade restarted on every held frame. The fix uses the same selected index for drawing and activation, immediately cancels/hides the preview and restores the list, and keeps ownership of the ongoing drag so the user can slide back into the alphabet without lifting.
+
+Restoring favorites also requires discarding ListView's previous all-apps scroll anchor when the Home header is reattached. The held-star transition now rebinds the existing adapter once and selects its first item. Physical six-second held-touch checks verified that the search shortcut and first favorite are visible before release on both edges.
