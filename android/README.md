@@ -4,14 +4,14 @@ An independently implemented, minimalist Android launcher with the Arlecchino cu
 
 ## Install and setup
 
-Download `Arlecchino-Home-Android-1.6.apk` from the [Android launcher release](https://github.com/tobyyu913/Arlecchino-Wallpaper/releases/tag/android-v1.6). Requires Android 9 or later.
+Download `Arlecchino-Home-Android-1.7.apk` from the [Android launcher release](https://github.com/tobyyu913/Arlecchino-Wallpaper/releases/tag/android-v1.7). Requires Android 9 or later.
 
 1. Install the APK and open **Arlecchino Home**.
 2. Tap **Choose favorites** and select your home-screen apps.
 3. Tap **Make this your home screen** and confirm Arlecchino Home in Android's home-app picker.
 4. Tap **Enable curtain wallpaper** if the wallpaper is not already active, then confirm it in the system wallpaper picker.
 
-Version 1.6 updates the existing Arlecchino Wallpaper package using the same signing key. The old wallpaper-only APKs remain available in earlier releases. Installing this version does not automatically change the default launcher or grant notification access.
+Version 1.7 updates the existing Arlecchino Wallpaper package using the same signing key. The old wallpaper-only APKs remain available in earlier releases. Installing this version does not automatically change the default launcher or grant notification access.
 
 ## Home-screen workflow
 
@@ -65,3 +65,7 @@ java -cp work/android-tests com.tobyyu.arlecchinowallpaper.AppIndexTest
 Wake tests cover missed/duplicate/rapid wake events, decode cancellation, replaced surfaces, timeouts, and returning home. App-index tests cover sorting and search.
 
 Physical Xiaomi testing verifies Home, search, favorite persistence, app launching, renaming/resetting labels, swipe-right app pop-ups, alphabet navigation, and pop-up folder management. Frame-timing tests compare repeated rail drags on the same device. See the reference checks for permission-gated test limits. The test left the user's original default launcher and notification-access settings unchanged. Prior wallpaper testing verified three normal wake cycles and recovery after five rapid screen-off/on cycles. APK signatures and alignment are checked by the build script.
+
+## Import favorites
+
+Open Arlecchino settings → Import favorites and select a JSON file containing an ordered array of installed package names or launcher components. For example: `["com.android.settings", "com.android.chrome"]`. A review dialog lists the apps in order before replacing favorites; unavailable entries are reported and duplicates are removed. Cancel or malformed files leave the current list unchanged. Imported favorites are also removed from the hidden-app list. No storage permission is needed: Android's file picker grants access only to the selected file. This is an Arlecchino JSON format, not a parser for Niagara's proprietary backup format.

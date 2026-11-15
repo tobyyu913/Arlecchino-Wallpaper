@@ -262,7 +262,7 @@ public final class HomeActivity extends Activity {
     gestureLayer.addView(gestureScroll);
     root.addView(gestureLayer, new FrameLayout.LayoutParams(-1, -1));
     rail = new Alphabet();
-    FrameLayout.LayoutParams rp = new FrameLayout.LayoutParams(dp(170), -1, Gravity.RIGHT);
+    FrameLayout.LayoutParams rp = new FrameLayout.LayoutParams(-1, -1, Gravity.RIGHT);
     root.addView(rail, rp);
     search = new EditText(this);
     search.setTextColor(INK);
@@ -922,6 +922,55 @@ public final class HomeActivity extends Activity {
         });
   }
 
+  @Override
+  protected void onActivityResult(int request, int result, Intent data) {
+    super.onActivityResult(request, result, data);
+    if (request != 701 || result != RESULT_OK || data == null || data.getData() == null) return;
+    try (java.io.InputStream input = getContentResolver().openInputStream(data.getData())) {
+      java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+      byte[] buffer = new byte[4096];
+      int count;
+      while ((count = input.read(buffer)) != -1) {
+        if (bytes.size() + count > 65536) throw new IllegalArgumentException("File too large");
+        bytes.write(buffer, 0, count);
+      }
+      JSONArray entries = new JSONArray(new String(bytes.toByteArray(), java.nio.charset.StandardCharsets.UTF_8));
+      if (entries.length() > 512) throw new IllegalArgumentException("Too many entries");
+      LinkedHashSet<String> imported = new LinkedHashSet<>();
+      StringBuilder names = new StringBuilder();
+      int skipped = 0;
+      for (int i = 0; i < entries.length(); i++) {
+        String entry = entries.getString(i);
+        ComponentName component = ComponentName.unflattenFromString(entry);
+        App match = app(component == null ? entry : component.flattenToString());
+        if (match == null) for (App candidate : apps)
+          if (candidate.pkg.equals(entry)) { match = candidate; break; }
+        if (match == null) { skipped++; continue; }
+        if (imported.add(match.id)) names.append(imported.size()).append(". ").append(label(match)).append('\n');
+      }
+      if (imported.isEmpty()) throw new IllegalArgumentException("No installed apps matched");
+      final int missing = skipped;
+      new AlertDialog.Builder(this)
+          .setTitle("Import " + imported.size() + " favorites?")
+          .setMessage("Replace your favorites with this order:\n\n" + names
+              + (missing == 0 ? "" : "\nUnavailable entries skipped: " + missing))
+          .setNegativeButton("Cancel", null)
+          .setPositiveButton("Import", (dialog, which) -> {
+            favorites.clear();
+            favorites.addAll(imported);
+            hidden.removeAll(imported);
+            prefs.edit().putStringSet("hidden", new HashSet<>(hidden)).apply();
+            saveFavorites();
+            home();
+          }).show();
+    } catch (Exception e) {
+      new AlertDialog.Builder(this).setTitle("Couldn't import favorites")
+          .setMessage("Choose a JSON array of installed package names or launcher components. "
+              + "Your favorites have not changed.")
+          .setPositiveButton("OK", null).show();
+    }
+  }
+
   private void settings() {
     List<String> labels =
         Arrays.asList(
@@ -933,7 +982,8 @@ public final class HomeActivity extends Activity {
             "Notification previews & replies",
             "Curtain wallpaper",
             "Default home app",
-            "System settings");
+            "System settings",
+            "Import favorites");
     sheet(
         "Arlecchino settings",
         labels,
@@ -977,6 +1027,10 @@ public final class HomeActivity extends Activity {
               break;
             case 8:
               startActivity(new Intent(Settings.ACTION_SETTINGS));
+              break;
+            case 9:
+              startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT)
+                  .addCategory(Intent.CATEGORY_OPENABLE).setType("application/json"), 701);
               break;
           }
         });
@@ -1160,7 +1214,7 @@ public final class HomeActivity extends Activity {
       edgeGesture = !searching && (downX < dp(20) || downX > root.getWidth() - dp(48));
       if (edgeGesture) {
         edgePointer = e.getPointerId(0);
-        rail.touch(e.getY(), e.getActionMasked());
+        rail.touch(e.getX(), e.getY(), e.getActionMasked());
         return true;
       }
     }
@@ -1169,14 +1223,14 @@ public final class HomeActivity extends Activity {
       boolean pointerLifted = action == MotionEvent.ACTION_POINTER_UP
           && e.getPointerId(e.getActionIndex()) == edgePointer;
       if (pointer < 0 || pointerLifted) {
-        rail.touch(rail.rawY, MotionEvent.ACTION_CANCEL);
+        rail.touch(rail.rawX, rail.rawY, MotionEvent.ACTION_CANCEL);
         edgeGesture = false;
         edgePointer = -1;
         // Consume the rest of this stream; it never began in the list.
         intercepted = true;
       } else if (action == MotionEvent.ACTION_MOVE || action == MotionEvent.ACTION_UP
           || action == MotionEvent.ACTION_CANCEL) {
-        rail.touch(e.getY(pointer), action);
+        rail.touch(e.getX(pointer), e.getY(pointer), action);
         if (action != MotionEvent.ACTION_MOVE) {
           edgeGesture = false;
           edgePointer = -1;
@@ -1423,7 +1477,8 @@ public final class HomeActivity extends Activity {
   private final class Alphabet extends View implements Choreographer.FrameCallback {
     final String letters = "★#ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    float strength, rawY, smoothY, trackStart, trackStep, animationScale = 1;
+    float strength, rawX, rawY, smoothY, downTrackX, trackStart, trackStep, animationScale = 1;
+    boolean leftEdge;
     boolean dragging, posted, tracking, moved;
     float downTrackY;
     int selected = -1, lastPosition = -1, lastOffset = Integer.MIN_VALUE;
@@ -1454,12 +1509,13 @@ public final class HomeActivity extends Activity {
       paint.setTextAlign(Paint.Align.CENTER);
       float begin = tracking ? trackStart : baseStart(), step = tracking ? trackStep : baseStep();
       float focus = tracking ? (smoothY - trackStart) / trackStep - .5f : selected;
+      float handPull = leftEdge ? 0 : Math.max(0, downTrackX - rawX);
       for (int i = 0; i < letters.length(); i++) {
         float distance = i - focus,
             wave = selected < 0 ? 0 : (float) Math.exp(-distance * distance / 45) * strength;
         paint.setTextSize(dp(16));
         paint.setColor(INK);
-        float x = getWidth() - dp(30) - dp(80) * wave;
+        float x = getWidth() - dp(30) - (dp(80) + handPull) * wave;
         float y = begin + step * (i + .5f);
         c.drawText(
             String.valueOf(letters.charAt(i)),
@@ -1468,7 +1524,7 @@ public final class HomeActivity extends Activity {
             paint);
       }
       if (selected >= 0 && strength > .01f) {
-        float x = getWidth() - dp(30) - dp(115) * strength;
+        float x = getWidth() - dp(30) - (dp(115) + handPull) * strength;
         float y = begin + step * (Math.max(0, Math.min(letters.length() - 1, focus)) + .5f);
         paint.setColor(0xFFE45776);
         paint.setStyle(Paint.Style.FILL);
@@ -1537,10 +1593,13 @@ public final class HomeActivity extends Activity {
       }
     }
 
-    void touch(float y, int action) {
+    void touch(float x, float y, int action) {
+      rawX = x;
       if (action == MotionEvent.ACTION_DOWN) {
         animationScale = Settings.Global.getFloat(
             getContentResolver(), Settings.Global.ANIMATOR_DURATION_SCALE, 1);
+        downTrackX = x;
+        leftEdge = x < root.getWidth() / 2f;
         trackStart = baseStart();
         trackStep = baseStep();
         rawY = smoothY = downTrackY = y;
