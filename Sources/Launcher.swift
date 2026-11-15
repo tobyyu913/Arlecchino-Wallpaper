@@ -8,6 +8,7 @@ struct DesktopApp: Identifiable {
 }
 
 final class LauncherModel: ObservableObject {
+    let music = LauncherMusic()
     @Published var apps: [DesktopApp] = []
     @Published var favorites: [String] = UserDefaults.standard.stringArray(forKey: "launcherFavorites") ?? []
     @Published var query = ""
@@ -141,6 +142,7 @@ struct LauncherView: View {
                     HStack(spacing: 2) {
                         ScrollView {
                             LazyVStack(alignment: .leading, spacing: 3) {
+                                if model.section == "★" && model.query.isEmpty { MusicPlayerView(music: model.music) }
                                 if model.visible.isEmpty {
                                     Text(model.query.isEmpty ? "Add favorites from All apps.\nRight-click an app to pin it here." : "No matching apps").font(.system(size: 13)).foregroundStyle(.white.opacity(0.5)).padding(.vertical, 20)
                                 }

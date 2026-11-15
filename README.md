@@ -45,6 +45,12 @@ The app is locally ad-hoc signed. This repository does not include a Developer I
 
 When the session locks, video playback pauses and its desktop layer becomes black. Wake-triggered openings are deferred until unlock while the session is locked. The configured opening behavior then resumes.
 
+## Music on favorites
+
+The favorites view shows a transparent, artwork-led media row only while a connected player has playing or paused media. It includes title, artist and previous/play-pause/next controls, with a larger outlined play button. No idle card, heading or progress bar takes up space. Showing/hiding the row gently shifts the favorites below it.
+
+On Mac, use **Settings → Music player** to choose Apple Music or Spotify. macOS asks for Automation access when a connected player is running; no permission is requested until you choose a player. Apple Music artwork is obtained through its scripting interface; Spotify artwork is fetched from the HTTPS artwork URL supplied by Spotify. Artwork stays in memory; Apple Music's temporary transfer file is removed immediately. Browser audio and other Mac music apps are not supported. The app never starts playback by itself. The connected player choice is stored locally.
+
 ## Display support
 
 Each connected display gets its own desktop window with a synchronized player. Windows follow the full screen rectangle, including the areas behind the Dock and menu bar, on all desktop Spaces. Connecting a monitor, changing resolution, or rotating a display updates existing windows in place without restarting playback. Windows are only created or removed when a display is actually added or disconnected; redundant screen notifications preserve the same video layers. Layout uses logical points and updates its backing scale for Retina displays.
@@ -74,10 +80,14 @@ work/tests/window-registry
 xcrun swiftc Sources/DisplayLayout.swift Sources/DesktopBacking.swift Tests/DesktopBacking/main.swift \
   -module-cache-path work/build/ModuleCache -o work/tests/desktop-backing
 work/tests/desktop-backing
-xcrun swiftc Sources/Launcher.swift Tests/AlphabetInput/main.swift \
+xcrun swiftc Sources/LauncherMusic.swift Sources/Launcher.swift Tests/AlphabetInput/main.swift \
   -module-cache-path work/build/ModuleCache -framework AppKit -framework SwiftUI \
   -o work/tests/launcher-interactions
 work/tests/launcher-interactions
+xcrun swiftc Sources/LauncherMusic.swift Tests/LauncherMusic/main.swift \
+  -module-cache-path work/build/ModuleCache -framework AppKit -framework SwiftUI \
+  -o work/tests/launcher-music
+work/tests/launcher-music
 ```
 
 Geometry checks cover 12 display sizes, three layout modes, negative/offset screen origins, character visibility, and aspect-ratio preservation. Window lifecycle checks verify that 100 redundant display events preserve the same window instances and cover monitor hot-plug, reordering, and removal. Physical display hot-plug and secure lock-screen behavior need testing on the target Mac.

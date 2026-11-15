@@ -39,6 +39,7 @@ public final class HomeActivity extends Activity {
   private int previewTransition;
   private ListView list;
   private LinearLayout homeHeader;
+  private MusicPlayerView musicPlayer;
   private TextView clock, date;
   private EditText search;
   private Alphabet rail;
@@ -57,6 +58,7 @@ public final class HomeActivity extends Activity {
         public void onReceive(Context c, Intent i) {
           String action = i.getAction();
           if (HomeNotifications.CHANGED.equals(action)) {
+            if (musicPlayer != null) musicPlayer.refreshArtwork();
             adapter.notifyDataSetChanged();
             return;
           }
@@ -183,6 +185,7 @@ public final class HomeActivity extends Activity {
     list.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
     homeHeader = new LinearLayout(this);
     homeHeader.setOrientation(LinearLayout.VERTICAL);
+    homeHeader.setClipChildren(false);
     View breathingRoom = new View(this);
     breathingRoom.setLayoutParams(
         new LinearLayout.LayoutParams(
@@ -215,6 +218,11 @@ public final class HomeActivity extends Activity {
     });
     homeHeader.addView(date);
     homeHeader.addView(searchChip, chipParams);
+    musicPlayer = new MusicPlayerView(this);
+    LinearLayout.LayoutParams musicParams = new LinearLayout.LayoutParams(-1, -2);
+    musicParams.leftMargin = -dp(2);
+    musicParams.bottomMargin = 0;
+    homeHeader.addView(musicPlayer, musicParams);
     homeHeader.setOnLongClickListener(v -> {
       settings();
       return true;
@@ -367,7 +375,14 @@ public final class HomeActivity extends Activity {
   protected void onResume() {
     super.onResume();
     updateClock();
+    if (musicPlayer != null) musicPlayer.start();
     if (adapter != null) adapter.notifyDataSetChanged();
+  }
+
+  @Override
+  protected void onPause() {
+    if (musicPlayer != null) musicPlayer.stop();
+    super.onPause();
   }
 
   private String label(App app) {
@@ -996,7 +1011,8 @@ public final class HomeActivity extends Activity {
             "Curtain wallpaper",
             "Default home app",
             "System settings",
-            "Import favorites");
+            "Import favorites",
+            "Music player");
     sheet(
         "Arlecchino settings",
         labels,
@@ -1040,6 +1056,14 @@ public final class HomeActivity extends Activity {
               break;
             case 8:
               startActivity(new Intent(Settings.ACTION_SETTINGS));
+              break;
+            case 10:
+              new AlertDialog.Builder(this).setTitle("Music player")
+                  .setSingleChoiceItems(new String[]{"Show when media is active", "Hide player"}, prefs.getBoolean("mediaPlayer", true) ? 0 : 1, (d, w) -> {
+                    prefs.edit().putBoolean("mediaPlayer", w == 0).apply();
+                    musicPlayer.refresh();
+                  }).setPositiveButton("Media access", (d, w) -> startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)))
+                  .setNegativeButton("Done", null).show();
               break;
             case 9:
               startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT)
@@ -1206,6 +1230,7 @@ public final class HomeActivity extends Activity {
   @Override
   protected void onDestroy() {
     dead = true;
+    if (musicPlayer != null) musicPlayer.stop();
     if (registered) unregisterReceiver(changes);
     worker.shutdownNow();
     ui.removeCallbacksAndMessages(null);

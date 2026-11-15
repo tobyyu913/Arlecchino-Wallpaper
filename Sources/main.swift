@@ -111,6 +111,7 @@ struct Preferences: View {
             Toggle("Summon at the left screen edge", isOn: $launcherEdgeTrigger)
             Toggle("Use original application icons", isOn: $launcherOriginalIcons).onChange(of: launcherOriginalIcons) { appDelegate.launcher.model.icons = launcherOriginalIcons }
             Text("Right-click apps to edit favorites. Drag the alphabet to browse. Show / hide launcher: ⌃⌥⌘ L").font(.caption).foregroundStyle(.secondary)
+            MusicConnectionSettings(music: appDelegate.launcher.model.music)
             Picker("Open the curtain", selection: $trigger) {
                 Text("On wake and unlock").tag("both")
                 Text("On unlock").tag("unlock")
@@ -184,7 +185,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
         UserDefaults.standard.register(defaults: ["trigger": "both", "closeKey": "q", "lockBackground": "black", "displayLayout": "character", "launcherEnabled": true, "launcherEdgeTrigger": true])
         buildMenu()
-        if !test { launcher.model.refresh(); launcher.rebuild(); launcher.startEdgeTrigger() }
+        launcher.model.music.shouldPoll = { [weak self] in
+            guard let self else { return false }
+            return !self.locked && self.launcher.model.section == "★" && self.launcher.model.query.isEmpty && self.launcher.windows.contains { $0.isVisible }
+        }
+        if !test { launcher.model.refresh(); launcher.rebuild(); launcher.startEdgeTrigger(); launcher.model.music.start() }
         registerShortcuts()
         if !test { applyLockBackground() }
         let workspace = NSWorkspace.shared.notificationCenter
@@ -494,6 +499,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     func applicationWillTerminate(_ notification: Notification) {
         launcher.stopEdgeTrigger()
+        launcher.model.music.stop()
         if !test { restoreWallpaper() }
         player.pause(); hotKeys.forEach { UnregisterEventHotKey($0) }
     }

@@ -136,3 +136,9 @@ The launcher prioritizes the selected pack's existing designs, then these app-sp
 Early native-device checks confirmed the PS2 and MyICA replacements render as white outlines alongside Arcticons. The user then requested off-device-only work; final completion, visual review and packaging continue locally without further phone control.
 
 After the user made the phone available again, the complete signed 1.9 build (version code 12) was installed. A native app-list check verified the new Mac Home replacement, Home/search restoration and existing favorites. The curtain wallpaper remained active. All 58 final PNGs passed alpha/transparency checks before and after APK packaging, and all 59 package mappings resolve to packaged resources. The complete contact sheet was reviewed at large and small sizes; a redundant controller word label was removed in a final image-generation pass.
+
+### Integrated media player, 1.11
+
+Checked Niagara's active player on the same Xiaomi phone and read its official [integrated media player explanation](https://help.niagaralauncher.app/article/11-media-widget). The reference row had 88 dp artwork, title and artist beside it, a 48 dp-high transport bar beneath, and an outlined larger central play button. It had no heading, enclosing card or progress bar. Arlecchino now uses that arrangement, preserving its search shortcut above the media row.
+
+The phone comparison verified real Spotify metadata and cover artwork in the revised player. When Spotify's media session later disappeared, the player collapsed and left the favorites/search view intact. Synthetic emulator sessions verify play/pause, previous/next, session switching, artwork, paused-session visibility, hiding stopped/released sessions, and reconnection on returning Home. The user's actual playback was not changed during the visual comparison. Exact animation parity and every media-app-specific behavior are not claimed.

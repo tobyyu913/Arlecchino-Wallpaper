@@ -31,6 +31,19 @@ public final class HomeNotifications extends NotificationListenerService {
 
   private static WeakReference<HomeNotifications> connected = new WeakReference<>(null);
 
+  static android.graphics.drawable.Drawable mediaArtwork(String packageName) {
+    HomeNotifications service = connected.get();
+    if (service == null) return null;
+    try {
+      for (StatusBarNotification item : service.getActiveNotifications()) {
+        Notification n = item.getNotification();
+        if (packageName.equals(item.getPackageName()) && n.extras.containsKey(Notification.EXTRA_MEDIA_SESSION) && n.getLargeIcon() != null)
+          return n.getLargeIcon().loadDrawable(service);
+      }
+    } catch (RuntimeException ignored) {}
+    return null;
+  }
+
   static void dismiss(String key) {
     HomeNotifications service = connected.get();
     if (service != null) service.cancelNotification(key);

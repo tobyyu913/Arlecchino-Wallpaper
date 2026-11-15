@@ -4,14 +4,14 @@ An independently implemented, minimalist Android launcher with the Arlecchino cu
 
 ## Install and setup
 
-Download `Arlecchino-Home-Android-1.9.apk` from the [Android launcher release](https://github.com/tobyyu913/Arlecchino-Wallpaper/releases/tag/android-v1.9). Requires Android 9 or later.
+Download `Arlecchino-Home-Android-1.11.apk` from the [Android launcher release](https://github.com/tobyyu913/Arlecchino-Wallpaper/releases/tag/android-v1.9). Requires Android 9 or later.
 
 1. Install the APK and open **Arlecchino Home**.
 2. Tap **Choose favorites** and select your home-screen apps.
 3. Tap **Make this your home screen** and confirm Arlecchino Home in Android's home-app picker.
 4. Tap **Enable curtain wallpaper** if the wallpaper is not already active, then confirm it in the system wallpaper picker.
 
-Version 1.9 updates the existing Arlecchino Wallpaper package using the same signing key. The old wallpaper-only APKs remain available in earlier releases. Installing this version does not automatically change the default launcher or grant notification access.
+Version 1.11 updates the existing Arlecchino Wallpaper package using the same signing key. The old wallpaper-only APKs remain available in earlier releases. Installing this version does not automatically change the default launcher or grant notification access.
 
 ## Home-screen workflow
 
@@ -28,6 +28,14 @@ Version 1.9 updates the existing Arlecchino Wallpaper package using the same sig
 - App installation/removal and clock/date changes refresh the launcher.
 
 This is an independent implementation of the free-version workflow, with additional Arlecchino styling. See [reference checks](REFERENCE-CHECKS.md) for observed surfaces, matching behavior and test limits. It does not claim exhaustive or pixel-for-pixel Niagara parity. Pro-only widget/calendar/weather integrations and work-profile support are not implemented.
+
+## Music on favorites
+
+The favorites view uses a transparent, artwork-led media row rather than a permanent card. The row appears only for an active playing, buffering or paused media session with a title, and gently collapses when playback stops or the session disappears. Artwork is supplied by the session or its media notification; an original player icon is the fallback. It keeps the whitespace above the clock and pushes favorites down.
+
+The layout was checked against Niagara's built-in player on the same Xiaomi phone: 88 dp artwork at the left, title and artist alongside it, and previous/play-pause/next underneath with a larger outlined play button. The earlier heading, background, idle text and progress bar have been removed. Tapping the artwork or track opens the session's player screen when supplied by the media app.
+
+Use **Arlecchino settings → Music player** to show/hide the adaptive row or open notification-access settings. Access uses the same optional listener as notification previews and is never granted automatically on your phone. No storage, audio recording or internet permission is added. Track details and artwork remain in memory. Controls follow each session's supported actions, and listeners reconnect on returning Home.
 
 ## Optional notification previews
 
@@ -61,6 +69,8 @@ javac -d work/android-tests android/src/com/tobyyu/arlecchinowallpaper/WakeCycle
 java -cp work/android-tests com.tobyyu.arlecchinowallpaper.WakeCycleTest
 java -cp work/android-tests com.tobyyu.arlecchinowallpaper.AppIndexTest
 ```
+
+Run `./scripts/test-android-music.sh EMULATOR_SERIAL [ADB_PORT]` on a disposable emulator for real MediaSession callback/transport tests. It refuses physical devices because it grants notification access for synthetic test sessions. The music tests cover title/artist updates, play/pause, previous/next, resume, active-player changes and destroyed sessions.
 
 Wake tests cover missed/duplicate/rapid wake events, decode cancellation, replaced surfaces, timeouts, and returning home. App-index tests cover sorting and search.
 
