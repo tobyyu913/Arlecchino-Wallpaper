@@ -10,6 +10,7 @@ JDK="${JAVA_HOME:-$(/usr/libexec/java_home -v 17)}"
 export JAVA_HOME="$JDK"
 export PATH="$JDK/bin:$PATH"
 mkdir -p "$BUILD/generated" "$BUILD/classes" "$BUILD/dex" "$KEYDIR" "$ROOT/outputs"
+find "$BUILD/classes" -name '*.class' -type f -delete
 "$TOOLS/aapt2" compile --dir "$ROOT/android/res" -o "$BUILD/resources.zip"
 "$TOOLS/aapt2" link -o "$BUILD/base.apk" -I "$PLATFORM" \
     --manifest "$ROOT/android/AndroidManifest.xml" -R "$BUILD/resources.zip" \
@@ -33,7 +34,7 @@ if [ ! -f "$KEYDIR/release.jks" ]; then
         -alias arlecchino -keyalg RSA -keysize 3072 -validity 10000 \
         -dname 'CN=Arlecchino Wallpaper' -storetype JKS
 fi
-APK="$ROOT/outputs/Arlecchino-Wallpaper-Android-1.1.apk"
+APK="$ROOT/outputs/Arlecchino-Home-Android-1.2.apk"
 "$TOOLS/apksigner" sign --ks "$KEYDIR/release.jks" --ks-key-alias arlecchino \
     --ks-pass "file:$KEYDIR/password.txt" \
     --out "$APK" "$BUILD/aligned.apk"

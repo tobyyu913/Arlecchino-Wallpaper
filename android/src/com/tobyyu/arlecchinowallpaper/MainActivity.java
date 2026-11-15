@@ -33,17 +33,18 @@ public final class MainActivity extends Activity {
         layout.addView(description);
         Button apply = new Button(this);
         apply.setText("Set wallpaper");
-        apply.setOnClickListener(view -> {
-            Intent intent = new Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER);
-            intent.putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
-                new ComponentName(this, CurtainWallpaperService.class));
-            try { startActivity(intent); }
-            catch (ActivityNotFoundException error) {
-                try { startActivity(new Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)); }
-                catch (ActivityNotFoundException missing) { Toast.makeText(this, "This device has no live wallpaper picker.", Toast.LENGTH_LONG).show(); }
-            }
-        });
+        apply.setOnClickListener(view -> applyWallpaper(this));
         layout.addView(apply);
         setContentView(layout);
+    }
+    static void applyWallpaper(Activity activity) {
+        Intent intent = new Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER);
+        intent.putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
+            new ComponentName(activity, CurtainWallpaperService.class));
+        try { activity.startActivity(intent); }
+        catch (ActivityNotFoundException error) {
+            try { activity.startActivity(new Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)); }
+            catch (ActivityNotFoundException missing) { Toast.makeText(activity, "This device has no live wallpaper picker.", Toast.LENGTH_LONG).show(); }
+        }
     }
 }

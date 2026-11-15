@@ -2,7 +2,7 @@
 
 Native Arlecchino curtain wallpapers for macOS and Android.
 
-**Android:** [download the APK](https://github.com/tobyyu913/Arlecchino-Wallpaper/releases/tag/android-v1.1) or read the [Android instructions](android/README.md). The Android version opens once on screen-on, then holds the open frame; it has no middle loop or closing action.
+**Android:** [download Arlecchino Home](https://github.com/tobyyu913/Arlecchino-Wallpaper/releases/tag/android-v1.2) or read the [Android instructions](android/README.md). The Android app now includes an original favorites-first launcher with alphabet navigation, search, and optional notification previews, over the curtain wallpaper. The curtain opens once on screen-on, then holds the open frame; it has no middle loop or closing action. Earlier wallpaper-only builds remain in previous releases.
 
 The macOS version is a small native menu-bar app dedicated to the Arlecchino curtain animation.
 

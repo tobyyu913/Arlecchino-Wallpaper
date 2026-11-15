@@ -1,39 +1,64 @@
-# Arlecchino Wallpaper for Android
+# Arlecchino Home for Android
 
-A minimal native live wallpaper. The curtain opens once on each screen-on cycle, then holds the last open frame. There is no middle loop, closing animation, shortcut, account, or settings screen.
+An independently implemented, minimalist Android launcher with the Arlecchino curtain wallpaper. No Niagara code, assets, branding, purchase checks, or modified APKs are used. The Niagara-Issues ZIP supplied during development contains release documentation and issue templates, not launcher source.
 
-## Install
+## Install and setup
 
-Download `Arlecchino-Wallpaper-Android-1.1.apk` from the [Android release](https://github.com/tobyyu913/Arlecchino-Wallpaper/releases/tag/android-v1.1), transfer it to your phone, and install it. Android may ask you to allow installation from the browser or file manager you use to open the APK.
+Download `Arlecchino-Home-Android-1.2.apk` from the [Android launcher release](https://github.com/tobyyu913/Arlecchino-Wallpaper/releases/tag/android-v1.2). Requires Android 9 or later.
 
-Open **Arlecchino Wallpaper**, tap **Set wallpaper**, then confirm in Android's wallpaper picker. Choose home and lock screens if your device offers that option. The app requests no internet, storage, accessibility, or notification permissions.
+1. Install the APK and open **Arlecchino Home**.
+2. Tap **Choose favorites** and select your home-screen apps.
+3. Tap **Make this your home screen** and confirm Arlecchino Home in Android's home-app picker.
+4. Tap **Enable curtain wallpaper** if the wallpaper is not already active, then confirm it in the system wallpaper picker.
 
-Requires Android 9 (API 28) or newer and live-wallpaper support. Written against standard Android APIs; manufacturer-specific features are not required. Android and the device determine which screens can use the wallpaper. If another app covers it at wake, the opening waits until the wallpaper becomes visible.
+Version 1.2 updates the existing Arlecchino Wallpaper package using the same signing key. The old wallpaper-only APKs remain available in earlier releases. Installing this version does not automatically change the default launcher or grant notification access.
 
-## Playback
+## Home-screen workflow
 
-The three-second opening is bundled as a 30 fps animated WebP. Android's native decoder plays it exactly once. A separate, pixel-matched final frame is then drawn once. A lightweight health check runs only while the wallpaper is visible and the display is interactive; it is stopped while hidden or asleep. Playback stops while the wallpaper is hidden or the screen is off. Returning to the home screen does not rearm playback; the next screen-off/on cycle does. Screen broadcasts, display-state changes, visibility, and current power state are reconciled together. Loading and playback have deadlines: stalled decoding or a lost completion callback falls back to the final open frame. A canceled load or surface loss before the first frame does not consume the pending opening. Surface loss after a frame is presented returns to the open resting frame without replaying. Late decoder results are rejected using generation tokens, and obsolete queued loads are discarded. Android may recreate the wallpaper process after reclaiming memory, in which case a fresh engine starts with an initial opening.
+- Favorites appear on Home; long-press to remove or move them up/down.
+- Slide along the right alphabet rail to browse all apps at a letter.
+- Tap the star on the rail, press Home, or press Back to return to favorites.
+- Search by app name or package name, including Unicode names and accent-insensitive matching.
+- Tap an app to launch it. Long-press any app for favorite and app-info actions.
+- Tap the clock to open alarms.
+- Use the top-right menu to manage favorites, toggle icons, choose a home app, apply the curtain wallpaper, or open system settings.
+- App installation/removal and clock/date changes refresh the launcher.
 
-The character is cropped from the empty black left side of the desktop source, fit without stretching, and positioned at the right edge. Extra screen area remains black. Layout accounts for scrolling launcher surfaces and orientation changes.
+This is an initial original launcher implementing the favorites/alphabet/search workflow, not a feature-complete Niagara replacement. Custom home widgets, calendar/weather integrations, icon-pack selection, work-profile apps, and every Niagara gesture are not implemented.
+
+## Optional notification previews
+
+Use **menu → Notification previews** to read the explanation and open Android's notification-access settings. Access is off until the user explicitly enables it. With access, the latest available notification appears beneath a favorite app; tapping it opens that notification's action.
+
+Preview contents stay in process memory, are cleared when the listener disconnects, and are not written to disk or sent anywhere. This permission can expose message contents, so it is optional. The app has no internet permission. Notification access was not enabled automatically during testing, and real notification preview rendering has not yet been tested.
+
+## Wallpaper
+
+The three-second curtain opening plays once each time the screen turns on and the wallpaper becomes visible, then holds the open frame. No middle loop or close action is added on Android. Surface/visibility transitions, display-state notifications, and power state are reconciled; deadlines recover stalled decoding or completion callbacks. Returning from an app does not normally restart a successfully presented opening. Android may recreate the whole wallpaper process, which starts with an initial opening.
+
+The launcher displays the system wallpaper underneath its transparent layout. Android controls lock-screen placement. The bundled animation is a portrait-framed 30 fps animated WebP decoded by Android, with a pixel-matched final PNG. There is no continuous idle animation; a visible-only health check runs while interactive and stops while hidden or asleep.
 
 ## Build
 
-Install JDK 17 and the Android SDK with platform 35 and build-tools 34.0.0, then run from the repository root:
+Install JDK 17, Android SDK platform 35, and build-tools 34.0.0, then run:
 
 ```sh
 ./scripts/build-android.sh
 ```
 
-The script uses SDK tools directly, without Gradle or third-party runtime dependencies. Set `ANDROID_HOME` if the SDK is not at `~/Library/Android/sdk`. Set `JAVA_HOME` for JDK 17 on other host platforms. `ANDROID_BUILD_TOOLS` and `ANDROID_PLATFORM_JAR` can override their default paths.
+The script uses Android SDK tools directly without Gradle or third-party runtime libraries. Set `ANDROID_HOME` for another SDK path, `JAVA_HOME` for JDK 17, or `ANDROID_BUILD_TOOLS` / `ANDROID_PLATFORM_JAR` to override SDK versions.
 
-The signed APK is written to `outputs/Arlecchino-Wallpaper-Android-1.1.apk`. A local release signing key is generated under ignored `work/android-signing/`. Keep that directory privately backed up to sign compatible future updates. Do not commit or publish the keystore or its password file. Building on another machine with a new signing key produces an APK that cannot update an installation signed by the original key.
+A private signing key is generated in ignored `work/android-signing/` on the first build. Back that directory up privately; do not publish it. Compatible updates must use the same signing key. A build with a different key cannot update an existing installation without uninstalling it.
 
-## Checks
+## Tests
 
 ```sh
 mkdir -p work/android-tests
-javac -d work/android-tests android/src/com/tobyyu/arlecchinowallpaper/WakeCycle.java android/tests/WakeCycleTest.java
+javac -d work/android-tests android/src/com/tobyyu/arlecchinowallpaper/WakeCycle.java android/tests/WakeCycleTest.java android/src/com/tobyyu/arlecchinowallpaper/AppIndex.java android/tests/AppIndexTest.java
 java -cp work/android-tests com.tobyyu.arlecchinowallpaper.WakeCycleTest
+java -cp work/android-tests com.tobyyu.arlecchinowallpaper.AppIndexTest
 ```
 
-The wake-cycle regression tests cover missed screen-off events, duplicate and rapid wake events, cancellation before a frame reaches the surface, surface replacement, late decoding, decoder and animation timeouts, deferred visibility, and 100 repeated returns to the home screen. APK signature, alignment, and manifest were also checked. Rendering and real screen-on behavior have not yet been tested on a phone or emulator.
+Wake tests cover missed/duplicate/rapid wake events, decode cancellation, replaced surfaces, timeouts, and returning home. App-index tests cover sorting and search.
+
+Physical Xiaomi testing of 1.2 verified initial Home, package-name search, pinning and removing a favorite, favorite persistence, launching Settings, alphabet C → Chrome, and returning Home to favorites. The test left the user's original default launcher and notification-access settings unchanged. Prior wallpaper testing verified three normal wake cycles and recovery after five rapid screen-off/on cycles. APK signatures and alignment are checked by the build script.
