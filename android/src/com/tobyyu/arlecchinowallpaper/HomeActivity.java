@@ -38,6 +38,10 @@ public final class HomeActivity extends Activity {
   private TextView clock, date;
   private EditText search;
   private Alphabet rail;
+  private FrameLayout gestureLayer;
+  private ScrollView gestureScroll;
+  private int previewIndex = -1;
+  private float previewTop;
   private AppsAdapter adapter;
   private boolean all, searching, dead, registered, showIcons = true;
   private int generation, topInset, bottomInset;
@@ -244,8 +248,15 @@ public final class HomeActivity extends Activity {
       else settings();
       return true;
     });
+    gestureLayer = new FrameLayout(this);
+    gestureLayer.setBackgroundColor(0x26000000);
+    gestureLayer.setVisibility(View.GONE);
+    gestureScroll = new ScrollView(this);
+    gestureScroll.setVerticalScrollBarEnabled(false);
+    gestureLayer.addView(gestureScroll);
+    root.addView(gestureLayer, new FrameLayout.LayoutParams(-1, -1));
     rail = new Alphabet();
-    FrameLayout.LayoutParams rp = new FrameLayout.LayoutParams(dp(72), -1, Gravity.RIGHT);
+    FrameLayout.LayoutParams rp = new FrameLayout.LayoutParams(dp(96), -1, Gravity.RIGHT);
     root.addView(rail, rp);
     search = new EditText(this);
     search.setTextColor(INK);
@@ -402,6 +413,12 @@ public final class HomeActivity extends Activity {
   }
 
   private void home() {
+    if (rail != null) rail.dragging = false;
+    gestureLayer.animate().cancel();
+    gestureLayer.setVisibility(View.GONE);
+    previewIndex = -1;
+    list.animate().cancel();
+    list.setAlpha(1);
     hideKeyboard();
     search.setText("");
     mode(false, false);
@@ -1284,6 +1301,73 @@ public final class HomeActivity extends Activity {
     }
   }
 
+  private void showGestureGroup(int index) {
+    if (index <= 0) {
+      hideGestureGroup(false);
+      return;
+    }
+    if (!all) mode(true, false);
+    if (previewIndex == index && gestureLayer.getVisibility() == View.VISIBLE) return;
+    previewIndex = index;
+    int first = rail.anchor(index), last = rows.size();
+    for (int i = first + 1; i < rows.size(); i++)
+      if (rows.get(i).app == null && rows.get(i).folder == null) {
+        last = i;
+        break;
+      }
+    LinearLayout group = new LinearLayout(this);
+    group.setOrientation(LinearLayout.VERTICAL);
+    for (int i = first; i < last; i++)
+      group.addView(adapter.getView(i, null, group), new LinearLayout.LayoutParams(-1, -2));
+    int width = Math.max(dp(100), root.getWidth() - dp(112));
+    group.measure(
+        View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+        View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+    int maxHeight = Math.max(dp(160), root.getHeight() - topInset - bottomInset - dp(120));
+    int height = Math.min(group.getMeasuredHeight(), Math.round(maxHeight * .72f));
+    previewTop =
+        Math.max(
+            topInset + dp(24),
+            Math.min(
+                root.getHeight() - bottomInset - height - dp(24),
+                root.getHeight() * .60f - height / 2f));
+    gestureScroll.removeAllViews();
+    gestureScroll.addView(group);
+    gestureScroll.scrollTo(0, 0);
+    FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(width, height);
+    params.leftMargin = dp(48);
+    params.topMargin = Math.round(previewTop);
+    gestureScroll.setLayoutParams(params);
+    gestureLayer.animate().cancel();
+    gestureLayer.setAlpha(1);
+    gestureLayer.setVisibility(View.VISIBLE);
+    list.animate().cancel();
+    list.setAlpha(0);
+  }
+
+  private void hideGestureGroup(boolean settle) {
+    if (gestureLayer.getVisibility() != View.VISIBLE) return;
+    if (settle && all && previewIndex > 0) {
+      int position = rail.anchor(previewIndex) + list.getHeaderViewsCount();
+      int offset = Math.round(previewTop) - list.getPaddingTop();
+      list.post(() -> {
+        if (all && !searching) list.setSelectionFromTop(position, offset);
+      });
+    }
+    previewIndex = -1;
+    list.animate().cancel();
+    list.animate().alpha(1).setDuration(130).start();
+    gestureLayer.animate().cancel();
+    gestureLayer
+        .animate()
+        .alpha(0)
+        .setDuration(130)
+        .withEndAction(() -> {
+          if (!rail.dragging) gestureLayer.setVisibility(View.GONE);
+        })
+        .start();
+  }
+
   private final class Alphabet extends View implements Choreographer.FrameCallback {
     final String letters = "★#ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -1321,14 +1405,31 @@ public final class HomeActivity extends Activity {
       for (int i = 0; i < letters.length(); i++) {
         float distance = i - focus,
             wave = selected < 0 ? 0 : (float) Math.exp(-distance * distance / 5.5) * strength;
-        paint.setTextSize(dp(12 + 10 * wave));
-        paint.setColor(i == selected ? ACCENT : INK);
-        float x = getWidth() - dp(18) - dp(36) * wave, y = begin + step * (i + .5f);
+        paint.setTextSize(dp(12 + 2 * wave));
+        paint.setColor(INK);
+        float x = getWidth() - dp(18) - dp(34) * wave;
+        float y = begin + step * (i + .5f) + Math.signum(distance) * dp(6) * wave;
         c.drawText(
             String.valueOf(letters.charAt(i)),
             x,
             y - (paint.ascent() + paint.descent()) / 2,
             paint);
+      }
+      if (selected >= 0 && strength > .01f) {
+        float x = getWidth() - dp(18) - dp(54) * strength;
+        float y = begin + step * (Math.max(0, Math.min(letters.length() - 1, focus)) + .5f);
+        paint.setColor(0xFFE45776);
+        paint.setStyle(Paint.Style.FILL);
+        c.drawCircle(x, y, dp(17) * strength, paint);
+        paint.clearShadowLayer();
+        paint.setColor(INK);
+        paint.setTextSize(dp(17));
+        c.drawText(
+            String.valueOf(letters.charAt(selected)),
+            x,
+            y - (paint.ascent() + paint.descent()) / 2,
+            paint);
+        paint.setShadowLayer(dp(2), 0, 0, Color.BLACK);
       }
     }
 
@@ -1362,20 +1463,13 @@ public final class HomeActivity extends Activity {
       }
       if (dragging) {
         if (focus < .3f) {
-          if (all || searching) home();
-        } else {
-          if (!all) mode(true, false);
-          int lower = Math.max(1, (int) Math.floor(focus)),
-              upper = Math.min(letters.length() - 1, lower + 1);
-          float fraction = Math.max(0, focus - lower),
-              position = anchor(lower) + (anchor(upper) - anchor(lower)) * fraction;
-          int row = (int) position, offset = dp(20) - Math.round((position - row) * dp(56));
-          if (row != lastPosition || Math.abs(offset - lastOffset) >= 1) {
-            list.setSelectionFromTop(row + list.getHeaderViewsCount(), offset);
-            lastPosition = row;
-            lastOffset = offset;
+          hideGestureGroup(false);
+          if (all || searching) {
+            hideKeyboard();
+            search.setText("");
+            mode(false, false);
           }
-        }
+        } else showGestureGroup(Math.max(1, index));
       }
       invalidate();
       if (dragging || Math.abs(rawY - smoothY) > .25f || strength > .01f) schedule();
@@ -1411,14 +1505,9 @@ public final class HomeActivity extends Activity {
                       letters.length() - 1,
                       Math.round((y - trackStart) / Math.max(1, trackStep) - .5f)));
           if (index == 0) home();
-          else {
-            if (!all) mode(true, false);
-            final int target = anchor(index) + list.getHeaderViewsCount();
-            list.post(() -> {
-              if (all && !searching) list.setSelectionFromTop(target, dp(20));
-            });
-          }
+          else showGestureGroup(index);
         }
+        hideGestureGroup(action == MotionEvent.ACTION_UP);
         rawY = y;
         dragging = false;
         schedule();

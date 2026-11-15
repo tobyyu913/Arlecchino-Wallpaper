@@ -4,20 +4,20 @@ An independently implemented, minimalist Android launcher with the Arlecchino cu
 
 ## Install and setup
 
-Download `Arlecchino-Home-Android-1.3.apk` from the [Android launcher release](https://github.com/tobyyu913/Arlecchino-Wallpaper/releases/tag/android-v1.3). Requires Android 9 or later.
+Download `Arlecchino-Home-Android-1.4.apk` from the [Android launcher release](https://github.com/tobyyu913/Arlecchino-Wallpaper/releases/tag/android-v1.4). Requires Android 9 or later.
 
 1. Install the APK and open **Arlecchino Home**.
 2. Tap **Choose favorites** and select your home-screen apps.
 3. Tap **Make this your home screen** and confirm Arlecchino Home in Android's home-app picker.
 4. Tap **Enable curtain wallpaper** if the wallpaper is not already active, then confirm it in the system wallpaper picker.
 
-Version 1.3 updates the existing Arlecchino Wallpaper package using the same signing key. The old wallpaper-only APKs remain available in earlier releases. Installing this version does not automatically change the default launcher or grant notification access.
+Version 1.4 updates the existing Arlecchino Wallpaper package using the same signing key. The old wallpaper-only APKs remain available in earlier releases. Installing this version does not automatically change the default launcher or grant notification access.
 
 ## Home-screen workflow
 
 - Favorites appear on Home; long-press to remove or move them up/down.
 - Slide along the right alphabet rail to browse all apps at a letter.
-- Drag either screen edge to scrub the alphabet. The wave and list update on display frames, with one stable track per gesture. Tap the star, press Home, or press Back to return to favorites.
+- Drag either screen edge to scrub the alphabet. The wave updates on display frames, with one stable track per gesture. During dragging, a filled crimson letter bubble and the selected app group float over a dimmed wallpaper; releasing transitions into the full app list. Tap the star, press Home, or press Back to return to favorites.
 - Use the Home search box or swipe up to search by app name, package, or phonetic spelling. Search starts with recent apps. Chinese phonetic grouping uses Android ICU on Android 10+; Android 9 falls back to character grouping.
 - Tap an app to launch it. Long-press any app for favorite and app-info actions.
 - Tap the clock to open alarms.

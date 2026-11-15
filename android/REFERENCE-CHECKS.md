@@ -44,3 +44,23 @@ This is a short diagnostic sample, not a general performance ranking: the two la
 The device interaction checks passed for Home/search, pinning, app launching, rename/reset, swipe-right pop-ups, right-edge C navigation, returning Home, and creating/opening/editing/removing a folder. Permission screens remained opt-in. Tests removed their own temporary favorite and folder.
 
 The persistent search shortcut was restored at the user's request. Arlecchino Outline is a bundled original icon style and does not require a separately installed pack. The alphabet uses Choreographer updates, stable gesture geometry, interpolated row offsets, and coalesced touch input. Header removal avoids leaving a cached clock-area gap in the app list.
+
+## Video reference: 1.4
+
+The developer's public video was reviewed as a temporal frame sequence, including enlarged frames around 3.4–5.2 seconds:
+
+https://niagaralauncher.com/wp-content/uploads/2026/02/reveal-scene-mobile.mp4
+
+That sequence shows a filled, pulled-out selected-letter bubble and a compact selected app group around the middle of the screen during an alphabet drag. This differs from 1.3's continuous full-list scroll from the top.
+
+Version 1.4 now uses:
+
+- A filled crimson letter bubble with the small alphabet letter remaining on the curved rail.
+- A wider wave area so the bubble is not clipped by the view edge.
+- A dimmed wallpaper layer and a compact, vertically centered selected-group preview during dragging.
+- A short transition into the full scrollable list when the gesture ends, aligned with the preview's position.
+- Explicit Home-state cleanup so a pending gesture cannot reopen the app list after returning Home.
+
+A 7.7-second recording of the physical Xiaomi was reviewed as a frame sequence to compare the drag, group changes, pointer bubble, and release transition. Reference videos and private device recordings remain in ignored local work files, not the public repository or APK.
+
+The persistent Home search box and original outline icons are retained as explicit user preferences, even where the reference video uses a different setup. This is a visual/interaction reference for these flows, not an assertion of complete parity with every Niagara feature.
