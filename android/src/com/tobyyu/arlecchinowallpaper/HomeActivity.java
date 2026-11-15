@@ -35,7 +35,10 @@ public final class HomeActivity extends Activity {
   private FrameLayout root;
   private View appScrim;
   private ImageView favoritesDeparture;
-  private boolean departingFavorites;
+  private boolean departingFavorites, pendingGestureSettle;
+  private android.animation.ValueAnimator favoritesAnimation;
+  private int departureGeneration;
+  private float departureOrigin;
   private int previewTransition;
   private ListView list;
   private LinearLayout homeHeader;
@@ -1230,6 +1233,7 @@ public final class HomeActivity extends Activity {
   @Override
   protected void onDestroy() {
     dead = true;
+    cancelFavoritesDeparture();
     if (musicPlayer != null) musicPlayer.stop();
     if (registered) unregisterReceiver(changes);
     worker.shutdownNow();
@@ -1426,11 +1430,16 @@ public final class HomeActivity extends Activity {
   }
 
   private void cancelFavoritesDeparture() {
+    departureGeneration++;
+    if (favoritesAnimation != null) { favoritesAnimation.cancel(); favoritesAnimation = null; }
+    pendingGestureSettle = false;
+    departingFavorites = false;
+    if (gestureLayer != null) gestureLayer.setTranslationY(0);
     if (favoritesDeparture == null) return;
     favoritesDeparture.animate().cancel();
     favoritesDeparture.setVisibility(View.GONE);
+    favoritesDeparture.setTranslationY(0);
     favoritesDeparture.setImageDrawable(null);
-    departingFavorites = false;
   }
 
   private boolean beginFavoritesDeparture() {
@@ -1439,17 +1448,66 @@ public final class HomeActivity extends Activity {
         || list.getWidth() == 0 || list.getHeight() == 0) return false;
     Bitmap snapshot = Bitmap.createBitmap(list.getWidth(), list.getHeight(), Bitmap.Config.ARGB_8888);
     list.draw(new Canvas(snapshot));
+    departureOrigin = root.getHeight() * .55f;
+    for (int i = 0; i < list.getChildCount(); i++) {
+      if (list.getFirstVisiblePosition() + i >= list.getHeaderViewsCount()) {
+        departureOrigin = list.getTop() + list.getChildAt(i).getTop();
+        break;
+      }
+    }
     favoritesDeparture.setImageBitmap(snapshot);
     favoritesDeparture.setAlpha(1);
     favoritesDeparture.setVisibility(View.VISIBLE);
     departingFavorites = true;
-    favoritesDeparture.animate().alpha(0).setDuration(180)
-        .withEndAction(() -> {
-          favoritesDeparture.setVisibility(View.GONE);
-          favoritesDeparture.setImageDrawable(null);
-          departingFavorites = false;
-        }).start();
+    // Hide the live list before removing its Home header. Only the unchanged
+    // snapshot and the incoming section are visible during the layout change.
+    list.animate().cancel();
+    list.setAlpha(0);
     return true;
+  }
+
+  private void animateFavoritesDeparture() {
+    final int token = departureGeneration;
+    final float travel = Math.max(dp(24), Math.min(dp(220), departureOrigin - previewTop - dp(48)));
+    gestureLayer.animate().cancel();
+    gestureLayer.setAlpha(0);
+    gestureLayer.setTranslationY(travel);
+    gestureLayer.getViewTreeObserver().addOnPreDrawListener(new android.view.ViewTreeObserver.OnPreDrawListener() {
+      public boolean onPreDraw() {
+        if (gestureLayer.getViewTreeObserver().isAlive())
+          gestureLayer.getViewTreeObserver().removeOnPreDrawListener(this);
+        if (token != departureGeneration || dead) return true;
+        favoritesAnimation = android.animation.ValueAnimator.ofFloat(0, 1);
+        favoritesAnimation.setDuration(260);
+        favoritesAnimation.setInterpolator(new android.view.animation.PathInterpolator(.2f, 0, .2f, 1));
+        favoritesAnimation.addUpdateListener(animation -> {
+          if (token != departureGeneration) return;
+          float progress = (Float) animation.getAnimatedValue();
+          favoritesDeparture.setAlpha(1 - progress);
+          favoritesDeparture.setTranslationY(-travel * progress);
+          gestureLayer.setAlpha(progress);
+          gestureLayer.setTranslationY(travel * (1 - progress));
+        });
+        favoritesAnimation.addListener(new android.animation.AnimatorListenerAdapter() {
+          @Override public void onAnimationEnd(android.animation.Animator animation) {
+            if (token != departureGeneration || dead) return;
+            favoritesAnimation = null;
+            departingFavorites = false;
+            favoritesDeparture.setVisibility(View.GONE);
+            favoritesDeparture.setImageDrawable(null);
+            favoritesDeparture.setTranslationY(0);
+            gestureLayer.setAlpha(1);
+            gestureLayer.setTranslationY(0);
+            boolean settle = pendingGestureSettle && !rail.dragging;
+            pendingGestureSettle = false;
+            if (settle) hideGestureGroup(true);
+          }
+        });
+        favoritesAnimation.start();
+        return true;
+      }
+    });
+    gestureLayer.requestLayout();
   }
 
   private void showGestureGroup(int index) {
@@ -1493,12 +1551,11 @@ public final class HomeActivity extends Activity {
     params.topMargin = Math.round(previewTop);
     gestureScroll.setLayoutParams(params);
     if (fadeIn) {
-      gestureLayer.animate().cancel();
-      gestureLayer.setAlpha(0);
-      gestureLayer.animate().alpha(1).setDuration(180).start();
+      animateFavoritesDeparture();
     } else if (!departingFavorites) {
       gestureLayer.animate().cancel();
       gestureLayer.setAlpha(1);
+      gestureLayer.setTranslationY(0);
     }
     gestureLayer.setVisibility(View.VISIBLE);
     list.animate().cancel();
@@ -1507,6 +1564,8 @@ public final class HomeActivity extends Activity {
 
   private void hideGestureGroup(boolean settle) {
     if (gestureLayer.getVisibility() != View.VISIBLE) return;
+    // A quick UP must not reveal the rebuilt list halfway through departure.
+    if (settle && departingFavorites) { pendingGestureSettle = true; return; }
     final int token = ++previewTransition;
     final int position =
         settle && all && previewIndex > 0
@@ -1684,6 +1743,7 @@ public final class HomeActivity extends Activity {
     void touch(float x, float y, int action) {
       rawX = x;
       if (action == MotionEvent.ACTION_DOWN) {
+        pendingGestureSettle = false;
         animationScale = Settings.Global.getFloat(
             getContentResolver(), Settings.Global.ANIMATOR_DURATION_SCALE, 1);
         downTrackX = x;
