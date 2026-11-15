@@ -1373,10 +1373,12 @@ public final class HomeActivity extends Activity {
         Drawable d = icons.get(a.id);
         if (d == null)
           try {
-            d =
-                iconPackPackage.equals("@outline")
-                    ? new MinimalIcon(a.pkg, label(a))
-                    : iconPack.icon(a.id, iconPackPackage);
+            if (iconPackPackage.equals("@outline")) {
+              d = AiIcons.icon(HomeActivity.this, a.pkg);
+              if (d == null) d = new MinimalIcon(a.pkg, label(a));
+            } else d = iconPack.icon(a.id, iconPackPackage);
+            if (d == null && !iconPackPackage.isEmpty())
+              d = AiIcons.icon(HomeActivity.this, a.pkg);
             if (d == null) d = a.info.loadIcon(getPackageManager());
             icons.put(a.id, d);
           } catch (RuntimeException ignored) {

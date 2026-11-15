@@ -126,3 +126,13 @@ Added a dedicated gear below Z. The previous star/letter spacing is preserved by
 Entering the app list from favorites now captures only the current list into a transient in-memory bitmap and crossfades it with the selected app group over 180ms. The rail remains live and finger-controlled throughout. Subsequent letter changes do not restart that transition, and returning to the star cancels it immediately to retain the requested favorites snap. Android's disabled-animation setting bypasses the snapshot transition. The bitmap is cleared on completion or cancellation and is never written to storage.
 
 Physical checks passed on both edges for held bottom preview, settings opening on release, held-star favorites, continuing the same drag back into M, and Home restoration after release. A local recording of favorites-to-alphabet navigation was reviewed as a frame sequence for the fade.
+
+## AI-generated missing-icon coverage: 1.9
+
+An on-device comparison against the selected Arcticons pack identified 59 launchable entries without a usable pack icon. Original icon images were used as private identity references for individual image-generation calls. 58 unique transparent assets cover those 59 packages; CloudDrive's native app and web shortcut reuse the same design. Original reference captures and the raw device audit remain in ignored local work files.
+
+The launcher prioritizes the selected pack's existing designs, then these app-specific replacements, then its normal fallback. The generated assets render through an alpha-mask Drawable with uniform ink, alpha-bound normalization and preserved aspect ratio. Decode sampling and the existing icon cache keep the runtime path local and bounded.
+
+Early native-device checks confirmed the PS2 and MyICA replacements render as white outlines alongside Arcticons. The user then requested off-device-only work; final completion, visual review and packaging continue locally without further phone control.
+
+After the user made the phone available again, the complete signed 1.9 build (version code 12) was installed. A native app-list check verified the new Mac Home replacement, Home/search restoration and existing favorites. The curtain wallpaper remained active. All 58 final PNGs passed alpha/transparency checks before and after APK packaging, and all 59 package mappings resolve to packaged resources. The complete contact sheet was reviewed at large and small sizes; a redundant controller word label was removed in a final image-generation pass.
