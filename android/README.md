@@ -4,31 +4,34 @@ An independently implemented, minimalist Android launcher with the Arlecchino cu
 
 ## Install and setup
 
-Download `Arlecchino-Home-Android-1.2.apk` from the [Android launcher release](https://github.com/tobyyu913/Arlecchino-Wallpaper/releases/tag/android-v1.2). Requires Android 9 or later.
+Download `Arlecchino-Home-Android-1.3.apk` from the [Android launcher release](https://github.com/tobyyu913/Arlecchino-Wallpaper/releases/tag/android-v1.3). Requires Android 9 or later.
 
 1. Install the APK and open **Arlecchino Home**.
 2. Tap **Choose favorites** and select your home-screen apps.
 3. Tap **Make this your home screen** and confirm Arlecchino Home in Android's home-app picker.
 4. Tap **Enable curtain wallpaper** if the wallpaper is not already active, then confirm it in the system wallpaper picker.
 
-Version 1.2 updates the existing Arlecchino Wallpaper package using the same signing key. The old wallpaper-only APKs remain available in earlier releases. Installing this version does not automatically change the default launcher or grant notification access.
+Version 1.3 updates the existing Arlecchino Wallpaper package using the same signing key. The old wallpaper-only APKs remain available in earlier releases. Installing this version does not automatically change the default launcher or grant notification access.
 
 ## Home-screen workflow
 
 - Favorites appear on Home; long-press to remove or move them up/down.
 - Slide along the right alphabet rail to browse all apps at a letter.
-- Tap the star on the rail, press Home, or press Back to return to favorites.
-- Search by app name or package name, including Unicode names and accent-insensitive matching.
+- Drag either screen edge to scrub the alphabet. The wave and list update on display frames, with one stable track per gesture. Tap the star, press Home, or press Back to return to favorites.
+- Use the Home search box or swipe up to search by app name, package, or phonetic spelling. Search starts with recent apps. Chinese phonetic grouping uses Android ICU on Android 10+; Android 9 falls back to character grouping.
 - Tap an app to launch it. Long-press any app for favorite and app-info actions.
 - Tap the clock to open alarms.
-- Use the top-right menu to manage favorites, toggle icons, choose a home app, apply the curtain wallpaper, or open system settings.
+- Long-press the clock or use Arlecchino settings at the end of the app list for setup and appearance controls.
+- Swipe right on an app for its pop-up. Long-press for favorite, rename, hide, info and uninstall actions.
+- Create pop-up folders from Edit favorites or settings.
+- Arlecchino Outline is a built-in original minimalist icon style. Theme controls also support system icons, standard separately installed icon packs, dimming, label sizes, and resetting renamed app labels.
 - App installation/removal and clock/date changes refresh the launcher.
 
-This is an initial original launcher implementing the favorites/alphabet/search workflow, not a feature-complete Niagara replacement. Custom home widgets, calendar/weather integrations, icon-pack selection, work-profile apps, and every Niagara gesture are not implemented.
+This is an independent implementation of the free-version workflow, with additional Arlecchino styling. See [reference checks](REFERENCE-CHECKS.md) for observed surfaces, matching behavior and test limits. It does not claim exhaustive or pixel-for-pixel Niagara parity. Pro-only widget/calendar/weather integrations and work-profile support are not implemented.
 
 ## Optional notification previews
 
-Use **menu → Notification previews** to read the explanation and open Android's notification-access settings. Access is off until the user explicitly enables it. With access, the latest available notification appears beneath a favorite app; tapping it opens that notification's action.
+Use **Arlecchino settings → Notification previews & replies** to read the explanation and open Android's notification-access settings. Access is off until the user explicitly enables it. With access, the latest available notification appears beneath its app; tapping it opens the notification action. App pop-ups can dismiss it or invoke an available direct-reply action. No message is sent until the user explicitly submits a reply.
 
 Preview contents stay in process memory, are cleared when the listener disconnects, and are not written to disk or sent anywhere. This permission can expose message contents, so it is optional. The app has no internet permission. Notification access was not enabled automatically during testing, and real notification preview rendering has not yet been tested.
 
@@ -61,4 +64,4 @@ java -cp work/android-tests com.tobyyu.arlecchinowallpaper.AppIndexTest
 
 Wake tests cover missed/duplicate/rapid wake events, decode cancellation, replaced surfaces, timeouts, and returning home. App-index tests cover sorting and search.
 
-Physical Xiaomi testing of 1.2 verified initial Home, package-name search, pinning and removing a favorite, favorite persistence, launching Settings, alphabet C → Chrome, and returning Home to favorites. The test left the user's original default launcher and notification-access settings unchanged. Prior wallpaper testing verified three normal wake cycles and recovery after five rapid screen-off/on cycles. APK signatures and alignment are checked by the build script.
+Physical Xiaomi testing verifies Home, search, favorite persistence, app launching, renaming/resetting labels, swipe-right app pop-ups, alphabet navigation, and pop-up folder management. Frame-timing tests compare repeated rail drags on the same device. See the reference checks for permission-gated test limits. The test left the user's original default launcher and notification-access settings unchanged. Prior wallpaper testing verified three normal wake cycles and recovery after five rapid screen-off/on cycles. APK signatures and alignment are checked by the build script.

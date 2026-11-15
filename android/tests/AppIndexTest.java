@@ -17,6 +17,10 @@ public final class AppIndexTest {
         Collator collator = Collator.getInstance(Locale.ENGLISH);
         names.sort((a,b) -> AppIndex.compare(a,b,collator));
         if (!names.equals(Arrays.asList("微信", "alpha", "Beta", "Éclair", "Zoom"))) throw new AssertionError(names);
-        System.out.println("PASS: alphabet groups, locale sorting, accent/Unicode/package search");
+        AppIndex.setTransliterator(value -> value.equals("微信") ? "wei xin" : value.equals("拼多多") ? "pin duo duo" : value);
+        if(!AppIndex.section("微信").equals("W") || !AppIndex.section("拼多多").equals("P"))throw new AssertionError("Phonetic grouping");
+        if(!AppIndex.matches("微信", "com.tencent.mm", "weixin"))throw new AssertionError("Phonetic search");
+        AppIndex.setTransliterator(value -> value);
+        System.out.println("PASS: alphabet groups, locale sorting, accent/Unicode/package search, phonetic grouping and search");
     }
 }
