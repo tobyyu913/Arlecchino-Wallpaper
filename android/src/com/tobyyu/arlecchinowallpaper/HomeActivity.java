@@ -431,6 +431,8 @@ public final class HomeActivity extends Activity {
     hideKeyboard();
     search.setText("");
     mode(false, false);
+    list.setAdapter(adapter);
+    list.setSelectionFromTop(0, 0);
   }
 
   private void openSearch() {
