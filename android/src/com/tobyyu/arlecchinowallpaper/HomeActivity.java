@@ -33,6 +33,8 @@ public final class HomeActivity extends Activity {
   private IconPack iconPack;
   private String iconPackPackage = "";
   private FrameLayout root;
+  private View appScrim;
+  private int previewTransition;
   private ListView list;
   private LinearLayout homeHeader;
   private TextView clock, date;
@@ -163,6 +165,10 @@ public final class HomeActivity extends Activity {
     getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
     root = new FrameLayout(this);
     root.setFocusableInTouchMode(true);
+    appScrim = new View(this);
+    appScrim.setBackgroundColor(0x30000000);
+    appScrim.setAlpha(0);
+    root.addView(appScrim, new FrameLayout.LayoutParams(-1, -1));
     root.setBackground(
         new GradientDrawable(
             GradientDrawable.Orientation.LEFT_RIGHT,
@@ -249,7 +255,7 @@ public final class HomeActivity extends Activity {
       return true;
     });
     gestureLayer = new FrameLayout(this);
-    gestureLayer.setBackgroundColor(0x26000000);
+    gestureLayer.setBackgroundColor(Color.TRANSPARENT);
     gestureLayer.setVisibility(View.GONE);
     gestureScroll = new ScrollView(this);
     gestureScroll.setVerticalScrollBarEnabled(false);
@@ -398,6 +404,8 @@ public final class HomeActivity extends Activity {
   private void mode(boolean appsMode, boolean searchMode) {
     all = appsMode;
     searching = searchMode;
+    appScrim.animate().cancel();
+    appScrim.animate().alpha(all || searching ? 1 : 0).setDuration(140).start();
     if (all || searching) {
       if (list.getHeaderViewsCount() > 0) list.removeHeaderView(homeHeader);
     } else if (list.getHeaderViewsCount() == 0) {
@@ -414,6 +422,7 @@ public final class HomeActivity extends Activity {
 
   private void home() {
     if (rail != null) rail.dragging = false;
+    previewTransition++;
     gestureLayer.animate().cancel();
     gestureLayer.setVisibility(View.GONE);
     previewIndex = -1;
@@ -1174,7 +1183,10 @@ public final class HomeActivity extends Activity {
       else if (downRow.folder != null) folderPopup(downRow.folder);
       return true;
     }
-    if (!all && !searching && e.getActionMasked() == MotionEvent.ACTION_MOVE) {
+    if (!all
+        && !searching
+        && (downRow == null || (downRow.app == null && downRow.folder == null))
+        && e.getActionMasked() == MotionEvent.ACTION_MOVE) {
       float dy = e.getY() - downY, dx = e.getX() - downX;
       if (dy < -dp(70) && Math.abs(dy) > Math.abs(dx) * 1.8 && downX > dp(120)) {
         MotionEvent cancel = MotionEvent.obtain(e);
@@ -1308,6 +1320,7 @@ public final class HomeActivity extends Activity {
     }
     if (!all) mode(true, false);
     if (previewIndex == index && gestureLayer.getVisibility() == View.VISIBLE) return;
+    previewTransition++;
     previewIndex = index;
     int first = rail.anchor(index), last = rows.size();
     for (int i = first + 1; i < rows.size(); i++)
@@ -1325,12 +1338,13 @@ public final class HomeActivity extends Activity {
         View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
     int maxHeight = Math.max(dp(160), root.getHeight() - topInset - bottomInset - dp(120));
     int height = Math.min(group.getMeasuredHeight(), Math.round(maxHeight * .72f));
-    previewTop =
-        Math.max(
-            topInset + dp(24),
-            Math.min(
-                root.getHeight() - bottomInset - height - dp(24),
-                root.getHeight() * .60f - height / 2f));
+    // The reference keeps each selected section's heading at one stable baseline.
+    // Short sections must not sink lower than long sections as the finger moves.
+    previewTop = Math.max(topInset + dp(24), root.getHeight() * .33f);
+    height =
+        Math.min(
+            group.getMeasuredHeight(),
+            Math.max(dp(80), root.getHeight() - bottomInset - dp(24) - Math.round(previewTop)));
     gestureScroll.removeAllViews();
     gestureScroll.addView(group);
     gestureScroll.scrollTo(0, 0);
@@ -1347,25 +1361,46 @@ public final class HomeActivity extends Activity {
 
   private void hideGestureGroup(boolean settle) {
     if (gestureLayer.getVisibility() != View.VISIBLE) return;
-    if (settle && all && previewIndex > 0) {
-      int position = rail.anchor(previewIndex) + list.getHeaderViewsCount();
-      int offset = Math.round(previewTop) - list.getPaddingTop();
-      list.post(() -> {
-        if (all && !searching) list.setSelectionFromTop(position, offset);
-      });
-    }
+    final int token = ++previewTransition;
+    final int position =
+        settle && all && previewIndex > 0
+            ? rail.anchor(previewIndex) + list.getHeaderViewsCount()
+            : -1;
+    final int offset = Math.round(previewTop) - list.getPaddingTop();
     previewIndex = -1;
-    list.animate().cancel();
-    list.animate().alpha(1).setDuration(130).start();
-    gestureLayer.animate().cancel();
-    gestureLayer
-        .animate()
-        .alpha(0)
-        .setDuration(130)
-        .withEndAction(() -> {
-          if (!rail.dragging) gestureLayer.setVisibility(View.GONE);
-        })
-        .start();
+    Runnable finish =
+        () -> {
+          if (token != previewTransition || dead) return;
+          list.animate().cancel();
+          list.animate().alpha(1).setDuration(100).start();
+          gestureLayer.animate().cancel();
+          gestureLayer
+              .animate()
+              .alpha(0)
+              .setDuration(100)
+              .withEndAction(() -> {
+                if (token == previewTransition && !rail.dragging)
+                  gestureLayer.setVisibility(View.GONE);
+              })
+              .start();
+        };
+    if (position >= 0) {
+      list.post(() -> {
+        if (token != previewTransition || !all || searching) return;
+        list.setSelectionFromTop(position, offset);
+        list.getViewTreeObserver()
+            .addOnPreDrawListener(
+                new android.view.ViewTreeObserver.OnPreDrawListener() {
+                  public boolean onPreDraw() {
+                    if (list.getViewTreeObserver().isAlive())
+                      list.getViewTreeObserver().removeOnPreDrawListener(this);
+                    finish.run();
+                    return true;
+                  }
+                });
+        list.requestLayout();
+      });
+    } else finish.run();
   }
 
   private final class Alphabet extends View implements Choreographer.FrameCallback {
@@ -1384,11 +1419,11 @@ public final class HomeActivity extends Activity {
     }
 
     float baseStart() {
-      return all ? dp(16) : getHeight() * .28f;
+      return getHeight() * .29f;
     }
 
     float baseStep() {
-      return Math.max(1, (getHeight() - baseStart() - bottomInset - dp(32)) / letters.length());
+      return Math.max(1, (getHeight() - baseStart() - bottomInset - dp(44)) / letters.length());
     }
 
     private void schedule() {
@@ -1448,7 +1483,9 @@ public final class HomeActivity extends Activity {
           lastFrame == 0 ? 1f / 60f : Math.min(.05f, (frameTime - lastFrame) / 1_000_000_000f);
       lastFrame = frameTime;
       float blend = 1 - (float) Math.exp(-45 * dt);
-      smoothY += (rawY - smoothY) * blend;
+      // Keep the pointer attached to the latest sampled touch. Only its
+      // appearance eases; low-pass filtering the position adds finger lag.
+      smoothY = dragging ? rawY : smoothY + (rawY - smoothY) * blend;
       strength += ((dragging ? 1 : 0) - strength) * blend;
       float focus =
           Math.max(

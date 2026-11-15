@@ -64,3 +64,18 @@ Version 1.4 now uses:
 A 7.7-second recording of the physical Xiaomi was reviewed as a frame sequence to compare the drag, group changes, pointer bubble, and release transition. Reference videos and private device recordings remain in ignored local work files, not the public repository or APK.
 
 The persistent Home search box and original outline icons are retained as explicit user preferences, even where the reference video uses a different setup. This is a visual/interaction reference for these flows, not an assertion of complete parity with every Niagara feature.
+
+## Matched physical-device comparison: 1.5
+
+Recorded the installed reference and Arlecchino on the same Xiaomi with the same slow rail drag, fast rail drag, and app-list fling commands. Videos have approximate timing alignment because ADB command startup differs.
+
+Corrections from this comparison:
+
+- Use the same alphabet range on Home and all-apps, with a stable selected-group heading position. A repeated M tap in each state produced the same 861 px heading baseline on this device.
+- Follow the latest finger position directly while easing the wave appearance, removing additional pointer lag.
+- Preserve native app-row flings instead of interpreting them as a search gesture. Empty-space swipe-up and the persistent search shortcut remain available.
+- Keep wallpaper dimming consistent across release and wait for list layout before fading the preview into the aligned list.
+
+An OCR estimate of matched label movement during the sampled upward-fling window measured approximately 3,721 px for the reference and 3,685 px for Arlecchino. This limited, phase-dependent sample supports retaining native fling friction; it does not establish identical physics. In the matched gesture run, each app reported one janky frame and zero missed vsyncs (2,032 rendered frames for Niagara, 1,850 for Arlecchino). Contents and capture timing differed.
+
+Local recordings are excluded from the repository and public release because they may contain personal device information.
