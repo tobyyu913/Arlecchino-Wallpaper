@@ -34,6 +34,8 @@ public final class HomeActivity extends Activity {
   private String iconPackPackage = "";
   private FrameLayout root;
   private View appScrim;
+  private ImageView favoritesDeparture;
+  private boolean departingFavorites;
   private int previewTransition;
   private ListView list;
   private LinearLayout homeHeader;
@@ -254,6 +256,10 @@ public final class HomeActivity extends Activity {
       else settings();
       return true;
     });
+    favoritesDeparture = new ImageView(this);
+    favoritesDeparture.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+    favoritesDeparture.setVisibility(View.GONE);
+    root.addView(favoritesDeparture, new FrameLayout.LayoutParams(-1, -1));
     gestureLayer = new FrameLayout(this);
     gestureLayer.setBackgroundColor(Color.TRANSPARENT);
     gestureLayer.setVisibility(View.GONE);
@@ -421,6 +427,7 @@ public final class HomeActivity extends Activity {
   }
 
   private void home() {
+    cancelFavoritesDeparture();
     if (rail != null) rail.dragging = false;
     previewTransition++;
     gestureLayer.animate().cancel();
@@ -506,7 +513,11 @@ public final class HomeActivity extends Activity {
       if (sorted.isEmpty()) rows.add(Row.title(apps.isEmpty() ? "Loading apps…" : "No apps found"));
       if (searching && !query.trim().isEmpty())
         rows.add(Row.action("Search web for “" + query + "”", "web"));
-      if (all) rows.add(Row.action("Arlecchino settings", "settings"));
+      if (all) {
+        sections.put("⚙", rows.size());
+        rows.add(Row.title("Settings"));
+        rows.add(Row.action("Arlecchino settings", "settings"));
+      }
     }
     adapter.notifyDataSetChanged();
     rail.invalidate();
@@ -1387,11 +1398,40 @@ public final class HomeActivity extends Activity {
     }
   }
 
+  private void cancelFavoritesDeparture() {
+    if (favoritesDeparture == null) return;
+    favoritesDeparture.animate().cancel();
+    favoritesDeparture.setVisibility(View.GONE);
+    favoritesDeparture.setImageDrawable(null);
+    departingFavorites = false;
+  }
+
+  private boolean beginFavoritesDeparture() {
+    cancelFavoritesDeparture();
+    if (!android.animation.ValueAnimator.areAnimatorsEnabled()
+        || list.getWidth() == 0 || list.getHeight() == 0) return false;
+    Bitmap snapshot = Bitmap.createBitmap(list.getWidth(), list.getHeight(), Bitmap.Config.ARGB_8888);
+    list.draw(new Canvas(snapshot));
+    favoritesDeparture.setImageBitmap(snapshot);
+    favoritesDeparture.setAlpha(1);
+    favoritesDeparture.setVisibility(View.VISIBLE);
+    departingFavorites = true;
+    favoritesDeparture.animate().alpha(0).setDuration(180)
+        .withEndAction(() -> {
+          favoritesDeparture.setVisibility(View.GONE);
+          favoritesDeparture.setImageDrawable(null);
+          departingFavorites = false;
+        }).start();
+    return true;
+  }
+
   private void showGestureGroup(int index) {
     if (index <= 0) {
       hideGestureGroup(false);
       return;
     }
+    boolean entering = !all && !searching;
+    boolean fadeIn = entering && beginFavoritesDeparture();
     if (!all) mode(true, false);
     if (previewIndex == index && gestureLayer.getVisibility() == View.VISIBLE) return;
     previewTransition++;
@@ -1425,8 +1465,14 @@ public final class HomeActivity extends Activity {
     params.leftMargin = dp(48);
     params.topMargin = Math.round(previewTop);
     gestureScroll.setLayoutParams(params);
-    gestureLayer.animate().cancel();
-    gestureLayer.setAlpha(1);
+    if (fadeIn) {
+      gestureLayer.animate().cancel();
+      gestureLayer.setAlpha(0);
+      gestureLayer.animate().alpha(1).setDuration(180).start();
+    } else if (!departingFavorites) {
+      gestureLayer.animate().cancel();
+      gestureLayer.setAlpha(1);
+    }
     gestureLayer.setVisibility(View.VISIBLE);
     list.animate().cancel();
     list.setAlpha(0);
@@ -1477,7 +1523,7 @@ public final class HomeActivity extends Activity {
   }
 
   private final class Alphabet extends View implements Choreographer.FrameCallback {
-    final String letters = "★#ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    final String letters = "★#ABCDEFGHIJKLMNOPQRSTUVWXYZ⚙";
     final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     float strength, rawX, rawY, smoothY, downTrackX, trackStart, trackStep, animationScale = 1;
     boolean leftEdge;
@@ -1497,7 +1543,7 @@ public final class HomeActivity extends Activity {
     }
 
     float baseStep() {
-      return Math.max(1, (getHeight() - baseStart() - bottomInset - dp(36)) / letters.length());
+      return Math.max(1, (getHeight() - baseStart() - bottomInset - dp(36)) / (letters.length() - 1));
     }
 
     private void schedule() {
@@ -1579,6 +1625,7 @@ public final class HomeActivity extends Activity {
       if (dragging) {
         if (index == 0) {
           if (sectionChanged || all || searching || previewIndex >= 0) {
+            cancelFavoritesDeparture();
             // Snap while held. Repeated preview fades would restart each frame,
             // leaving the favorites list invisible until the finger lifts.
             previewTransition++;
@@ -1638,7 +1685,11 @@ public final class HomeActivity extends Activity {
                       letters.length() - 1,
                       Math.round((y - trackStart) / Math.max(1, trackStep) - .5f)));
           if (index == 0) home();
-          else showGestureGroup(index);
+          else if (index == letters.length() - 1) {
+            cancelFavoritesDeparture();
+            hideGestureGroup(false);
+            settings();
+          } else showGestureGroup(index);
         }
         hideGestureGroup(action == MotionEvent.ACTION_UP);
         rawY = y;

@@ -118,3 +118,11 @@ The horizontal-pull test exposed clipping at the old 170dp rail boundary. The vi
 The star was drawn using rounded letter selection, but favorites activation used a narrower fractional threshold. In part of the star's hit region the UI therefore displayed a star while retaining the previous app group. Furthermore, the preview fade restarted on every held frame. The fix uses the same selected index for drawing and activation, immediately cancels/hides the preview and restores the list, and keeps ownership of the ongoing drag so the user can slide back into the alphabet without lifting.
 
 Restoring favorites also requires discarding ListView's previous all-apps scroll anchor when the Home header is reattached. The held-star transition now rebinds the existing adapter once and selects its first item. Physical six-second held-touch checks verified that the search shortcut and first favorite are visible before release on both edges.
+
+## Bottom settings target and departure transition: 1.8
+
+Added a dedicated gear below Z. The previous star/letter spacing is preserved by reserving the existing final slot spacing for the extra target. Holding the gear previews Settings; releasing there opens Arlecchino settings. Moving away before release continues alphabet navigation.
+
+Entering the app list from favorites now captures only the current list into a transient in-memory bitmap and crossfades it with the selected app group over 180ms. The rail remains live and finger-controlled throughout. Subsequent letter changes do not restart that transition, and returning to the star cancels it immediately to retain the requested favorites snap. Android's disabled-animation setting bypasses the snapshot transition. The bitmap is cleared on completion or cancellation and is never written to storage.
+
+Physical checks passed on both edges for held bottom preview, settings opening on release, held-star favorites, continuing the same drag back into M, and Home restoration after release. A local recording of favorites-to-alphabet navigation was reviewed as a frame sequence for the fade.
