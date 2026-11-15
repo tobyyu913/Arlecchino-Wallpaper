@@ -4,14 +4,14 @@ An independently implemented, minimalist Android launcher with the Arlecchino cu
 
 ## Install and setup
 
-Download `Arlecchino-Home-Android-1.5.apk` from the [Android launcher release](https://github.com/tobyyu913/Arlecchino-Wallpaper/releases/tag/android-v1.5). Requires Android 9 or later.
+Download `Arlecchino-Home-Android-1.6.apk` from the [Android launcher release](https://github.com/tobyyu913/Arlecchino-Wallpaper/releases/tag/android-v1.6). Requires Android 9 or later.
 
 1. Install the APK and open **Arlecchino Home**.
 2. Tap **Choose favorites** and select your home-screen apps.
 3. Tap **Make this your home screen** and confirm Arlecchino Home in Android's home-app picker.
 4. Tap **Enable curtain wallpaper** if the wallpaper is not already active, then confirm it in the system wallpaper picker.
 
-Version 1.5 updates the existing Arlecchino Wallpaper package using the same signing key. The old wallpaper-only APKs remain available in earlier releases. Installing this version does not automatically change the default launcher or grant notification access.
+Version 1.6 updates the existing Arlecchino Wallpaper package using the same signing key. The old wallpaper-only APKs remain available in earlier releases. Installing this version does not automatically change the default launcher or grant notification access.
 
 ## Home-screen workflow
 

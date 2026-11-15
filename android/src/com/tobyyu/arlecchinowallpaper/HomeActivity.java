@@ -46,7 +46,7 @@ public final class HomeActivity extends Activity {
   private float previewTop;
   private AppsAdapter adapter;
   private boolean all, searching, dead, registered, showIcons = true;
-  private int generation, topInset, bottomInset;
+  private int generation, topInset, bottomInset, edgePointer = -1;
   private float downX, downY;
   private Row downRow;
   private boolean edgeGesture, intercepted;
@@ -262,7 +262,7 @@ public final class HomeActivity extends Activity {
     gestureLayer.addView(gestureScroll);
     root.addView(gestureLayer, new FrameLayout.LayoutParams(-1, -1));
     rail = new Alphabet();
-    FrameLayout.LayoutParams rp = new FrameLayout.LayoutParams(dp(96), -1, Gravity.RIGHT);
+    FrameLayout.LayoutParams rp = new FrameLayout.LayoutParams(dp(170), -1, Gravity.RIGHT);
     root.addView(rail, rp);
     search = new EditText(this);
     search.setTextColor(INK);
@@ -1157,16 +1157,31 @@ public final class HomeActivity extends Activity {
           list.pointToPosition((int) e.getX() - list.getLeft(), (int) e.getY() - list.getTop())
               - list.getHeaderViewsCount();
       if (rowPosition >= 0 && rowPosition < rows.size()) downRow = rows.get(rowPosition);
-      edgeGesture = !searching && (downX < dp(20) || downX > root.getWidth() - dp(28));
+      edgeGesture = !searching && (downX < dp(20) || downX > root.getWidth() - dp(48));
       if (edgeGesture) {
+        edgePointer = e.getPointerId(0);
         rail.touch(e.getY(), e.getActionMasked());
         return true;
       }
     }
     if (edgeGesture) {
-      rail.touch(e.getY(), e.getActionMasked());
-      if (e.getActionMasked() == MotionEvent.ACTION_UP
-          || e.getActionMasked() == MotionEvent.ACTION_CANCEL) edgeGesture = false;
+      int action = e.getActionMasked(), pointer = e.findPointerIndex(edgePointer);
+      boolean pointerLifted = action == MotionEvent.ACTION_POINTER_UP
+          && e.getPointerId(e.getActionIndex()) == edgePointer;
+      if (pointer < 0 || pointerLifted) {
+        rail.touch(rail.rawY, MotionEvent.ACTION_CANCEL);
+        edgeGesture = false;
+        edgePointer = -1;
+        // Consume the rest of this stream; it never began in the list.
+        intercepted = true;
+      } else if (action == MotionEvent.ACTION_MOVE || action == MotionEvent.ACTION_UP
+          || action == MotionEvent.ACTION_CANCEL) {
+        rail.touch(e.getY(pointer), action);
+        if (action != MotionEvent.ACTION_MOVE) {
+          edgeGesture = false;
+          edgePointer = -1;
+        }
+      }
       return true;
     }
     if (!intercepted
@@ -1183,7 +1198,8 @@ public final class HomeActivity extends Activity {
       else if (downRow.folder != null) folderPopup(downRow.folder);
       return true;
     }
-    if (!all
+    if (!intercepted
+        && !all
         && !searching
         && (downRow == null || (downRow.app == null && downRow.folder == null))
         && e.getActionMasked() == MotionEvent.ACTION_MOVE) {
@@ -1199,7 +1215,8 @@ public final class HomeActivity extends Activity {
       }
     }
     if (intercepted) {
-      if (e.getActionMasked() == MotionEvent.ACTION_UP) intercepted = false;
+      if (e.getActionMasked() == MotionEvent.ACTION_UP
+          || e.getActionMasked() == MotionEvent.ACTION_CANCEL) intercepted = false;
       return true;
     }
     return super.dispatchTouchEvent(e);
@@ -1236,12 +1253,13 @@ public final class HomeActivity extends Activity {
         TextView title =
             recycled instanceof TextView
                 ? (TextView) recycled
-                : text("", row.action == null ? 28 : 16, row.action == null ? INK : MUTED);
+                : text("", row.action == null ? 20 : 16, row.action == null ? INK : MUTED);
         title.setText(row.title);
-        title.setTextSize(row.action == null ? 28 : 16);
+        title.setTextSize(row.action == null ? 20 : 16);
         title.setGravity(Gravity.CENTER_VERTICAL);
         title.setPadding(0, dp(row.action == null ? 16 : 10), 0, dp(10));
-        title.setMinHeight(dp(row.action == null ? 58 : 48));
+        title.setMinHeight(dp(48));
+        title.setTypeface(null, row.action == null ? Typeface.BOLD : Typeface.NORMAL);
         title.setClickable(false);
         return title;
       }
@@ -1259,7 +1277,7 @@ public final class HomeActivity extends Activity {
         line.addView(icon, ip);
         LinearLayout words = new LinearLayout(HomeActivity.this);
         words.setOrientation(LinearLayout.VERTICAL);
-        words.addView(text("", 22, INK));
+        words.addView(text("", 16, INK));
         TextView preview = text("", 14, MUTED);
         preview.setPadding(0, dp(2), 0, 0);
         preview.setMaxLines(3);
@@ -1270,7 +1288,7 @@ public final class HomeActivity extends Activity {
       LinearLayout words = (LinearLayout) line.getChildAt(1);
       TextView name = (TextView) words.getChildAt(0), preview = (TextView) words.getChildAt(1);
       name.setTextSize(
-          prefs.getInt("textSize", 1) == 0 ? 19 : prefs.getInt("textSize", 1) == 2 ? 25 : 22);
+          prefs.getInt("textSize", 1) == 0 ? 14 : prefs.getInt("textSize", 1) == 2 ? 19 : 16);
       name.setMaxLines(2);
       icon.setVisibility(showIcons ? View.VISIBLE : View.GONE);
       if (row.app == null) {
@@ -1336,11 +1354,10 @@ public final class HomeActivity extends Activity {
     group.measure(
         View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
         View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
-    int maxHeight = Math.max(dp(160), root.getHeight() - topInset - bottomInset - dp(120));
-    int height = Math.min(group.getMeasuredHeight(), Math.round(maxHeight * .72f));
+    int height;
     // The reference keeps each selected section's heading at one stable baseline.
     // Short sections must not sink lower than long sections as the finger moves.
-    previewTop = Math.max(topInset + dp(24), root.getHeight() * .33f);
+    previewTop = Math.max(topInset + dp(24), root.getHeight() * .296f);
     height =
         Math.min(
             group.getMeasuredHeight(),
@@ -1406,7 +1423,7 @@ public final class HomeActivity extends Activity {
   private final class Alphabet extends View implements Choreographer.FrameCallback {
     final String letters = "★#ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    float strength, rawY, smoothY, trackStart, trackStep;
+    float strength, rawY, smoothY, trackStart, trackStep, animationScale = 1;
     boolean dragging, posted, tracking, moved;
     float downTrackY;
     int selected = -1, lastPosition = -1, lastOffset = Integer.MIN_VALUE;
@@ -1423,7 +1440,7 @@ public final class HomeActivity extends Activity {
     }
 
     float baseStep() {
-      return Math.max(1, (getHeight() - baseStart() - bottomInset - dp(44)) / letters.length());
+      return Math.max(1, (getHeight() - baseStart() - bottomInset - dp(36)) / letters.length());
     }
 
     private void schedule() {
@@ -1439,11 +1456,11 @@ public final class HomeActivity extends Activity {
       float focus = tracking ? (smoothY - trackStart) / trackStep - .5f : selected;
       for (int i = 0; i < letters.length(); i++) {
         float distance = i - focus,
-            wave = selected < 0 ? 0 : (float) Math.exp(-distance * distance / 5.5) * strength;
-        paint.setTextSize(dp(12 + 2 * wave));
+            wave = selected < 0 ? 0 : (float) Math.exp(-distance * distance / 45) * strength;
+        paint.setTextSize(dp(16));
         paint.setColor(INK);
-        float x = getWidth() - dp(18) - dp(34) * wave;
-        float y = begin + step * (i + .5f) + Math.signum(distance) * dp(6) * wave;
+        float x = getWidth() - dp(30) - dp(80) * wave;
+        float y = begin + step * (i + .5f);
         c.drawText(
             String.valueOf(letters.charAt(i)),
             x,
@@ -1451,14 +1468,14 @@ public final class HomeActivity extends Activity {
             paint);
       }
       if (selected >= 0 && strength > .01f) {
-        float x = getWidth() - dp(18) - dp(54) * strength;
+        float x = getWidth() - dp(30) - dp(115) * strength;
         float y = begin + step * (Math.max(0, Math.min(letters.length() - 1, focus)) + .5f);
         paint.setColor(0xFFE45776);
         paint.setStyle(Paint.Style.FILL);
-        c.drawCircle(x, y, dp(17) * strength, paint);
+        c.drawCircle(x, y, dp(22) * strength, paint);
         paint.clearShadowLayer();
         paint.setColor(INK);
-        paint.setTextSize(dp(17));
+        paint.setTextSize(dp(28));
         c.drawText(
             String.valueOf(letters.charAt(selected)),
             x,
@@ -1482,11 +1499,13 @@ public final class HomeActivity extends Activity {
       float dt =
           lastFrame == 0 ? 1f / 60f : Math.min(.05f, (frameTime - lastFrame) / 1_000_000_000f);
       lastFrame = frameTime;
-      float blend = 1 - (float) Math.exp(-45 * dt);
+      float blend = 1 - (float) Math.exp(-45 * dt / Math.max(.05f, animationScale));
       // Keep the pointer attached to the latest sampled touch. Only its
       // appearance eases; low-pass filtering the position adds finger lag.
       smoothY = dragging ? rawY : smoothY + (rawY - smoothY) * blend;
-      strength += ((dragging ? 1 : 0) - strength) * blend;
+      float targetStrength = dragging ? 1 : 0;
+      strength = android.animation.ValueAnimator.areAnimatorsEnabled()
+          ? strength + (targetStrength - strength) * blend : targetStrength;
       float focus =
           Math.max(
               0,
@@ -1520,6 +1539,8 @@ public final class HomeActivity extends Activity {
 
     void touch(float y, int action) {
       if (action == MotionEvent.ACTION_DOWN) {
+        animationScale = Settings.Global.getFloat(
+            getContentResolver(), Settings.Global.ANIMATOR_DURATION_SCALE, 1);
         trackStart = baseStart();
         trackStep = baseStep();
         rawY = smoothY = downTrackY = y;
@@ -1533,8 +1554,10 @@ public final class HomeActivity extends Activity {
         if (Math.abs(y - downTrackY) > dp(4)) moved = true;
         rawY = y;
         schedule();
-      } else {
-        if (action == MotionEvent.ACTION_UP && dragging && !moved) {
+      } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+        // Commit the final touch before ending the gesture, even if UP arrives
+        // before Choreographer has consumed the last MOVE.
+        if (action == MotionEvent.ACTION_UP && dragging) {
           int index =
               Math.max(
                   0,
@@ -1552,8 +1575,9 @@ public final class HomeActivity extends Activity {
     }
 
     public boolean onTouchEvent(MotionEvent e) {
-      touch(e.getY(), e.getActionMasked());
-      return true;
+      // Activity dispatch owns the narrow edge hit target. The broad visual wave
+      // must not steal list scrolling or app taps underneath it.
+      return false;
     }
 
     protected void onDetachedFromWindow() {

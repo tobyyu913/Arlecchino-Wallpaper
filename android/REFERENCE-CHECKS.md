@@ -79,3 +79,24 @@ Corrections from this comparison:
 An OCR estimate of matched label movement during the sampled upward-fling window measured approximately 3,721 px for the reference and 3,685 px for Arlecchino. This limited, phase-dependent sample supports retaining native fling friction; it does not establish identical physics. In the matched gesture run, each app reported one janky frame and zero missed vsyncs (2,032 rendered frames for Niagara, 1,850 for Arlecchino). Contents and capture timing differed.
 
 Local recordings are excluded from the repository and public release because they may contain personal device information.
+
+## Official documentation and measured geometry: 1.6
+
+Reviewed the official landing page, all Features and How-To category indexes, the gesture and notification guides, left-hand mode, alphabet settings and localization, pop-ups, app-launch animation limitations, the press kit, the research page, and release history. Relevant primary references:
+
+- [Search versus scrolling](https://help.niagaralauncher.app/article/90-mastering-the-search-gesture): distinguishes quick flicks from deliberate pulls.
+- [Notification gesture](https://help.niagaralauncher.app/article/98-notification-gesture) and [Tips and Tricks](https://help.niagaralauncher.app/article/34-tips-and-tricks): notification-tray pulls, app pop-ups, clock/date actions, suggestions. The tray-pull gesture is not implemented here.
+- [Left-hand mode](https://help.niagaralauncher.app/article/39-left-hand-mode): an invisible left-edge target with a left-aligned app list.
+- [Alphabet settings](https://help.niagaralauncher.app/article/171-alphabet-settings) and [localization](https://help.niagaralauncher.app/article/155-alphabet-localization): per-letter usage ordering and language-dependent grouping. Scandinavian/Spanish extra alphabet letters remain a gap.
+- [Pop-ups](https://help.niagaralauncher.app/article/115-pop-ups): basic folders and app shortcuts are available in the reference free version. Widget pop-ups and stacks remain unimplemented here.
+- [Gesture-navigation issues](https://help.niagaralauncher.app/article/7-gesture-navigation) and [app-launch animations](https://help.niagaralauncher.app/article/81-app-launch-animations): some app/home/recents transitions are controlled by Android or the OEM launcher.
+- [v1.13.14 release notes](https://github.com/NiagaraLauncher/Niagara-Issues/releases/tag/v1.13.14): changing animation settings should take effect without restarting; gesture behavior must remain functional when animations are disabled.
+- [Quick-launch apps](https://help.niagaralauncher.app/article/88-quick-launch-apps): documents continuous alphabet-to-app launching as a concept, not an available feature.
+
+On the physical Xiaomi at 480 dpi, held C/M/V captures exposed differences that the earlier frame-time comparison did not: the old curve only displaced a few adjacent letters, the pointer was too small and too close to the edge, and 22sp app labels were larger than the reference's approximately 16sp labels. Version 1.6 broadens the Gaussian wave, uses a 30dp resting inset and 115dp pointer pull, increases the bubble radius to 22dp, uses 16dp alphabet glyphs, and reduces app labels/headings to 16sp/20sp. The section block moves up to the measured baseline region. Crimson styling and bundled original outline icons remain intentional differences.
+
+The wider visual rail passes app taps and flings through to the list; only the edge begins alphabet navigation. The right hit target includes the visible letters. Release commits the final letter synchronously, including rapid drags whose final MOVE has not reached the next display frame. Pointer ownership prevents a secondary finger from ending the primary drag. Custom wave easing reads Android's animator-duration scale at gesture start and bypasses easing when Android disables animators.
+
+These are documented observations and targeted corrections, not a claim of complete 1:1 parity. Short physical clips cannot establish identical scroll physics, and undocumented timing constants remain estimates. Private recordings stay local.
+
+Version 1.6 physical checks passed: persistent search opens, a quick app-row fling remains scrolling, swipe-right opens the app pop-up, 20/80/400 ms rail drags finish at M, both screen edges navigate, and Home restores after release. Disabled-animation rail navigation and Home restoration also passed; the original animator-duration scale (1.0) was restored in a finally block. The temporary Chrome favorite was removed. Multi-pointer ownership was reviewed and built, but multi-touch injection was unavailable on this device, so that particular path is not claimed as physically tested.
