@@ -34,7 +34,7 @@ if [ ! -f "$KEYDIR/release.jks" ]; then
         -alias arlecchino -keyalg RSA -keysize 3072 -validity 10000 \
         -dname 'CN=Arlecchino Wallpaper' -storetype JKS
 fi
-APK="$ROOT/outputs/Arlecchino-Home-Android-1.12.apk"
+APK="$ROOT/outputs/Arlecchino-Home-Android-1.13.apk"
 "$TOOLS/apksigner" sign --ks "$KEYDIR/release.jks" --ks-key-alias arlecchino \
     --ks-pass "file:$KEYDIR/password.txt" \
     --out "$APK" "$BUILD/aligned.apk"

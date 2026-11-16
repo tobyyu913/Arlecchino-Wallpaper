@@ -28,7 +28,14 @@ public final class HomeActivity extends Activity {
   private final List<Row> rows = new ArrayList<>();
   private final Set<String> favorites = new LinkedHashSet<>(), hidden = new HashSet<>();
   private final Map<String, Integer> sections = new HashMap<>();
-  private final android.util.LruCache<String, Drawable> icons = new android.util.LruCache<>(72);
+  private final android.util.LruCache<String, Drawable> icons = new android.util.LruCache<>(192);
+  private final ExecutorService iconWorker = Executors.newSingleThreadExecutor();
+  private final Map<String, List<java.lang.ref.WeakReference<ImageView>>> iconWaiters = new HashMap<>();
+  private final Map<String, String> sectionCache = new HashMap<>();
+  private final android.util.LruCache<Integer, LinearLayout> gestureGroups = new android.util.LruCache<>(4);
+  private int iconGeneration;
+  private boolean iconPackReady;
+  private Bitmap departureBitmap;
   private SharedPreferences prefs;
   private IconPack iconPack;
   private String iconPackPackage = "";
@@ -62,6 +69,7 @@ public final class HomeActivity extends Activity {
           String action = i.getAction();
           if (HomeNotifications.CHANGED.equals(action)) {
             if (musicPlayer != null) musicPlayer.refreshArtwork();
+            gestureGroups.evictAll();
             adapter.notifyDataSetChanged();
             return;
           }
@@ -70,7 +78,7 @@ public final class HomeActivity extends Activity {
               || Intent.ACTION_DATE_CHANGED.equals(action)
               || Intent.ACTION_TIMEZONE_CHANGED.equals(action)) updateClock();
           else {
-            icons.evictAll();
+            invalidateIcons();
             loadApps();
           }
         }
@@ -163,7 +171,8 @@ public final class HomeActivity extends Activity {
     loadSets();
     showIcons = prefs.getBoolean("icons", true);
     iconPackPackage = prefs.getString("iconPack", "@outline");
-    iconPack = new IconPack(this, iconPackPackage);
+    iconPack = new IconPack(this, "");
+    iconPackReady = false;
     getWindow().addFlags(WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER);
     getWindow().setBackgroundDrawableResource(android.R.color.transparent);
     if (Build.VERSION.SDK_INT >= 30) getWindow().setDecorFitsSystemWindows(false);
@@ -392,6 +401,57 @@ public final class HomeActivity extends Activity {
     return prefs.getString("name:" + app.id, app.label);
   }
 
+  private String sectionOf(App app) {
+    String name = label(app), section = sectionCache.get(name);
+    if (section == null) { section = AppIndex.section(name); sectionCache.put(name, section); }
+    return section;
+  }
+
+  private void invalidateIcons() {
+    iconGeneration++;
+    icons.evictAll();
+    iconWaiters.clear();
+  }
+
+  private void requestIcon(App app, ImageView target) {
+    target.setTag(app.id);
+    Drawable cached = icons.get(app.id);
+    target.setImageDrawable(cached);
+    if (cached != null || !iconPackReady || dead) return;
+    List<java.lang.ref.WeakReference<ImageView>> waiters = iconWaiters.get(app.id);
+    boolean queued = waiters != null;
+    if (waiters == null) { waiters = new ArrayList<>(); iconWaiters.put(app.id, waiters); }
+    waiters.add(new java.lang.ref.WeakReference<>(target));
+    if (queued) return;
+    final int token = iconGeneration, size = dp(40);
+    final String packPackage = iconPackPackage;
+    final IconPack pack = iconPack;
+    iconWorker.execute(() -> {
+      Drawable image = null;
+      try {
+        if (packPackage.equals("@outline")) {
+          image = AiIcons.icon(this, app.pkg);
+          if (image == null) image = new MinimalIcon(app.pkg, app.label);
+        } else image = pack.icon(app.id, packPackage);
+        if (image == null && !packPackage.isEmpty()) image = AiIcons.icon(this, app.pkg);
+        if (image == null) image = app.info.loadIcon(getPackageManager());
+        Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        image.setBounds(0, 0, size, size); image.draw(new Canvas(bitmap));
+        image = new BitmapDrawable(getResources(), bitmap);
+      } catch (RuntimeException ignored) {}
+      final Drawable decoded = image;
+      ui.post(() -> {
+        if (dead || token != iconGeneration) return;
+        List<java.lang.ref.WeakReference<ImageView>> views = iconWaiters.remove(app.id);
+        if (decoded != null) icons.put(app.id, decoded);
+        if (views != null) for (java.lang.ref.WeakReference<ImageView> ref : views) {
+          ImageView view = ref.get();
+          if (view != null && app.id.equals(view.getTag())) view.setImageDrawable(decoded);
+        }
+      });
+    });
+  }
+
   private App app(String id) {
     for (App a : apps) if (a.id.equals(id)) return a;
     return null;
@@ -399,7 +459,10 @@ public final class HomeActivity extends Activity {
 
   private void loadApps() {
     final int token = ++generation;
+    final String packPackage = iconPackPackage;
     worker.execute(() -> {
+      IconPack loadedPack = new IconPack(this, packPackage);
+      Map<String, String> loadedSections = new HashMap<>();
       List<App> result = new ArrayList<>();
       Set<String> seen = new HashSet<>();
       Intent intent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
@@ -412,12 +475,18 @@ public final class HomeActivity extends Activity {
           long installed =
               getPackageManager().getPackageInfo(i.activityInfo.packageName, 0).firstInstallTime;
           App a = new App(i, i.loadLabel(getPackageManager()).toString(), installed);
-          if (seen.add(a.id)) result.add(a);
+          if (seen.add(a.id)) {
+            result.add(a);
+            String name = prefs.getString("name:" + a.id, a.label);
+            loadedSections.put(name, AppIndex.section(name));
+          }
         } catch (PackageManager.NameNotFoundException | RuntimeException ignored) {
         }
       }
       ui.post(() -> {
         if (dead || token != generation) return;
+        iconPack = loadedPack; iconPackReady = true;
+        sectionCache.clear(); sectionCache.putAll(loadedSections);
         apps.clear();
         apps.addAll(result);
         rebuild();
@@ -480,6 +549,7 @@ public final class HomeActivity extends Activity {
   }
 
   private void rebuild() {
+    gestureGroups.evictAll();
     rows.clear();
     sections.clear();
     String query = searching ? search.getText().toString() : "";
@@ -507,7 +577,7 @@ public final class HomeActivity extends Activity {
           if (av != bv) return Long.compare(bv, av);
           return Long.compare(b.installed, a.installed);
         }
-        int group = AppIndex.section(label(a)).compareTo(AppIndex.section(label(b)));
+        int group = sectionOf(a).compareTo(sectionOf(b));
         if (group != 0) return group;
         if (prefs.getBoolean("usageOrder", true)) {
           int count =
@@ -520,7 +590,7 @@ public final class HomeActivity extends Activity {
       int limit = searching && query.isEmpty() ? Math.min(8, sorted.size()) : sorted.size();
       for (int i = 0; i < limit; i++) {
         App a = sorted.get(i);
-        String next = AppIndex.section(label(a));
+        String next = sectionOf(a);
         if (!searching && !next.equals(group)) {
           group = next;
           sections.put(group, rows.size());
@@ -1135,9 +1205,10 @@ public final class HomeActivity extends Activity {
         n -> {
           iconPackPackage = packages.get(n);
           prefs.edit().putString("iconPack", iconPackPackage).apply();
-          iconPack = new IconPack(this, iconPackPackage);
-          icons.evictAll();
-          rebuild();
+          iconPack = new IconPack(this, "");
+          iconPackReady = false;
+          invalidateIcons();
+          loadApps();
         });
   }
 
@@ -1237,8 +1308,11 @@ public final class HomeActivity extends Activity {
     if (musicPlayer != null) musicPlayer.stop();
     if (registered) unregisterReceiver(changes);
     worker.shutdownNow();
+    iconWorker.shutdownNow();
+    iconWaiters.clear();
+    departureBitmap = null;
     ui.removeCallbacksAndMessages(null);
-    icons.evictAll();
+    invalidateIcons();
     super.onDestroy();
   }
 
@@ -1388,6 +1462,7 @@ public final class HomeActivity extends Activity {
       name.setMaxLines(2);
       icon.setVisibility(showIcons ? View.VISIBLE : View.GONE);
       if (row.app == null) {
+        icon.setTag(null);
         name.setText(folderName(row.folder));
         line.setContentDescription(folderName(row.folder) + ", folder");
         icon.setImageDrawable(getDrawable(R.drawable.folder));
@@ -1398,22 +1473,8 @@ public final class HomeActivity extends Activity {
       App a = row.app;
       name.setText(label(a));
       line.setContentDescription(label(a) + (favorites.contains(a.id) ? ", favorite" : ""));
-      if (showIcons) {
-        Drawable d = icons.get(a.id);
-        if (d == null)
-          try {
-            if (iconPackPackage.equals("@outline")) {
-              d = AiIcons.icon(HomeActivity.this, a.pkg);
-              if (d == null) d = new MinimalIcon(a.pkg, label(a));
-            } else d = iconPack.icon(a.id, iconPackPackage);
-            if (d == null && !iconPackPackage.isEmpty())
-              d = AiIcons.icon(HomeActivity.this, a.pkg);
-            if (d == null) d = a.info.loadIcon(getPackageManager());
-            icons.put(a.id, d);
-          } catch (RuntimeException ignored) {
-          }
-        icon.setImageDrawable(d);
-      }
+      if (showIcons) requestIcon(a, icon);
+      else icon.setTag(null);
       HomeNotifications.Preview n = HomeNotifications.latest(a.pkg);
       boolean recent = searching && search.getText().length() == 0;
       preview.setVisibility(n != null || recent ? View.VISIBLE : View.GONE);
@@ -1446,8 +1507,13 @@ public final class HomeActivity extends Activity {
     cancelFavoritesDeparture();
     if (!android.animation.ValueAnimator.areAnimatorsEnabled()
         || list.getWidth() == 0 || list.getHeight() == 0) return false;
-    Bitmap snapshot = Bitmap.createBitmap(list.getWidth(), list.getHeight(), Bitmap.Config.ARGB_8888);
-    list.draw(new Canvas(snapshot));
+    int width = Math.max(1, list.getWidth() / 2), height = Math.max(1, list.getHeight() / 2);
+    if (departureBitmap == null || departureBitmap.getWidth() != width || departureBitmap.getHeight() != height)
+      departureBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+    departureBitmap.eraseColor(Color.TRANSPARENT);
+    Canvas canvas = new Canvas(departureBitmap);
+    canvas.scale(width / (float) list.getWidth(), height / (float) list.getHeight());
+    list.draw(canvas);
     departureOrigin = root.getHeight() * .55f;
     for (int i = 0; i < list.getChildCount(); i++) {
       if (list.getFirstVisiblePosition() + i >= list.getHeaderViewsCount()) {
@@ -1455,7 +1521,7 @@ public final class HomeActivity extends Activity {
         break;
       }
     }
-    favoritesDeparture.setImageBitmap(snapshot);
+    favoritesDeparture.setImageBitmap(departureBitmap);
     favoritesDeparture.setAlpha(1);
     favoritesDeparture.setVisibility(View.VISIBLE);
     departingFavorites = true;
@@ -1527,10 +1593,14 @@ public final class HomeActivity extends Activity {
         last = i;
         break;
       }
-    LinearLayout group = new LinearLayout(this);
-    group.setOrientation(LinearLayout.VERTICAL);
-    for (int i = first; i < last; i++)
-      group.addView(adapter.getView(i, null, group), new LinearLayout.LayoutParams(-1, -2));
+    LinearLayout group = gestureGroups.get(index);
+    if (group == null) {
+      group = new LinearLayout(this);
+      group.setOrientation(LinearLayout.VERTICAL);
+      for (int i = first; i < last; i++)
+        group.addView(adapter.getView(i, null, group), new LinearLayout.LayoutParams(-1, -2));
+      gestureGroups.put(index, group);
+    }
     int width = Math.max(dp(100), root.getWidth() - dp(112));
     group.measure(
         View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
@@ -1610,6 +1680,7 @@ public final class HomeActivity extends Activity {
 
   private final class Alphabet extends View implements Choreographer.FrameCallback {
     final String letters = "★#ABCDEFGHIJKLMNOPQRSTUVWXYZ⚙";
+    final String[] glyphs = new String[letters.length()];
     final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     float strength, rawX, rawY, smoothY, downTrackX, trackStart, trackStep, animationScale = 1;
     boolean leftEdge;
@@ -1620,6 +1691,7 @@ public final class HomeActivity extends Activity {
 
     Alphabet() {
       super(HomeActivity.this);
+      for (int i = 0; i < letters.length(); i++) glyphs[i] = String.valueOf(letters.charAt(i));
       paint.setShadowLayer(dp(2), 0, 0, Color.BLACK);
       setContentDescription("Alphabet index. Slide to jump to apps; star returns Home.");
     }
@@ -1644,17 +1716,18 @@ public final class HomeActivity extends Activity {
       float begin = tracking ? trackStart : baseStart(), step = tracking ? trackStep : baseStep();
       float focus = tracking ? (smoothY - trackStart) / trackStep - .5f : selected;
       float handPull = leftEdge ? 0 : Math.max(0, downTrackX - rawX);
+      paint.setTextSize(dp(16));
+      paint.setColor(INK);
+      float baseline = -(paint.ascent() + paint.descent()) / 2;
       for (int i = 0; i < letters.length(); i++) {
         float distance = i - focus,
             wave = selected < 0 ? 0 : (float) Math.exp(-distance * distance / 45) * strength;
-        paint.setTextSize(dp(16));
-        paint.setColor(INK);
         float x = getWidth() - dp(30) - (dp(80) + handPull) * wave;
         float y = begin + step * (i + .5f);
         c.drawText(
-            String.valueOf(letters.charAt(i)),
+            glyphs[i],
             x,
-            y - (paint.ascent() + paint.descent()) / 2,
+            y + baseline,
             paint);
       }
       if (selected >= 0 && strength > .01f) {
@@ -1667,7 +1740,7 @@ public final class HomeActivity extends Activity {
         paint.setColor(INK);
         paint.setTextSize(dp(28));
         c.drawText(
-            String.valueOf(letters.charAt(selected)),
+            glyphs[selected],
             x,
             y - (paint.ascent() + paint.descent()) / 2,
             paint);
@@ -1706,7 +1779,7 @@ public final class HomeActivity extends Activity {
       if (dragging && sectionChanged) {
         selected = index;
         performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK);
-        announceForAccessibility(String.valueOf(letters.charAt(index)));
+        announceForAccessibility(glyphs[index]);
       }
       if (dragging) {
         if (index == 0) {

@@ -2,7 +2,7 @@
 
 Native Arlecchino curtain wallpapers for macOS and Android.
 
-**Android:** [download Arlecchino Home](https://github.com/tobyyu913/Arlecchino-Wallpaper/releases/tag/android-v1.12) or read the [Android instructions](android/README.md). The Android app now includes an original favorites-first launcher with a frame-driven alphabet wave, persistent search, bundled outline icons, app pop-ups/folders, and optional notification previews/replies, over the curtain wallpaper. The curtain opens once on screen-on, then holds the open frame; it has no middle loop or closing action. Earlier wallpaper-only builds remain in previous releases.
+**Android:** [download Arlecchino Home](https://github.com/tobyyu913/Arlecchino-Wallpaper/releases/tag/android-v1.13) or read the [Android instructions](android/README.md). The Android app now includes an original favorites-first launcher with a frame-driven alphabet wave, persistent search, bundled outline icons, app pop-ups/folders, and optional notification previews/replies, over the curtain wallpaper. The curtain opens once on screen-on, then holds the open frame; it has no middle loop or closing action. Earlier wallpaper-only builds remain in previous releases.
 
 The macOS version combines the Arlecchino curtain animation with an optional favorites-first desktop launcher. Search installed applications, move the cursor over the alphabet to browse without clicking; the strip bends outward into its own right-hand gutter with an enlarged letter preview, leaving app rows clickable, or swipe with two fingers over the strip to scroll with native trackpad momentum, and right-click any app to add or remove a favorite. The launcher sits beneath normal windows on every connected display.
 
@@ -52,6 +52,10 @@ The favorites view shows a transparent, artwork-led media row only while a conne
 
 On Mac, use **Settings → Music player** to choose Apple Music or Spotify. macOS asks for Automation access when a connected player is running; no permission is requested until you choose a player. Apple Music artwork is obtained through its scripting interface; Spotify artwork is fetched from the HTTPS artwork URL supplied by Spotify. Artwork stays in memory; Apple Music's temporary transfer file is removed immediately. Browser audio and other Mac music apps are not supported. The app never starts playback by itself. The connected player choice is stored locally.
 
+## Performance
+
+The Mac launcher caches its app catalog for warm summons, indexes sections/favorites and isolates row-hover rendering. Fully occluded wallpaper playback pauses until visible again without restarting the curtain. The desktop and summoned panel share catalog updates without repeating scans.
+
 ## Display support
 
 Each connected display gets its own desktop window with a synchronized player. Windows follow the full screen rectangle, including the areas behind the Dock and menu bar, on all desktop Spaces. Connecting a monitor, changing resolution, or rotating a display updates existing windows in place without restarting playback. Windows are only created or removed when a display is actually added or disconnected; redundant screen notifications preserve the same video layers. Layout uses logical points and updates its backing scale for Retina displays.
@@ -93,6 +97,10 @@ xcrun swiftc Sources/LauncherMusic.swift Sources/Launcher.swift Tests/LauncherWi
   -module-cache-path work/build/ModuleCache -framework AppKit -framework SwiftUI \
   -o work/tests/launcher-windows
 work/tests/launcher-windows
+xcrun swiftc -O Sources/LauncherMusic.swift Sources/Launcher.swift Tests/LauncherPerformance/main.swift \
+  -module-cache-path work/build/ModuleCache -framework AppKit -framework SwiftUI \
+  -o work/tests/launcher-performance
+work/tests/launcher-performance
 ```
 
 Geometry checks cover 12 display sizes, three layout modes, negative/offset screen origins, character visibility, and aspect-ratio preservation. Window lifecycle checks verify that 100 redundant display events preserve the same window instances and cover monitor hot-plug, reordering, and removal. Physical display hot-plug and secure lock-screen behavior need testing on the target Mac.

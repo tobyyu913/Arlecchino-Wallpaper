@@ -23,14 +23,15 @@ final class MusicPlayerView extends LinearLayout {
   private final ImageView artwork;
   private final ImageButton previous, play, next;
   private android.animation.ValueAnimator visibilityAnimation;
-  private boolean mediaVisible;
+  private boolean mediaVisible, artworkResolved;
+  private String artworkIdentity = "";
   private final List<MediaController> controllers = new ArrayList<>();
   private MediaController current;
   private boolean started, listening, allowed;
   private int healthTicks;
   private final MediaSessionManager.OnActiveSessionsChangedListener sessions = this::bind;
   private final MediaController.Callback callback = new MediaController.Callback() {
-    @Override public void onMetadataChanged(MediaMetadata metadata) { render(); }
+    @Override public void onMetadataChanged(MediaMetadata metadata) { artworkResolved = false; render(); }
     @Override public void onPlaybackStateChanged(PlaybackState state) { render(); }
     @Override public void onSessionDestroyed() { refresh(); }
   };
@@ -203,8 +204,11 @@ final class MusicPlayerView extends LinearLayout {
 
   }
   private void setEnabled(View view, boolean enabled) { view.setEnabled(enabled); view.setAlpha(enabled ? 1 : .3f); }
-  void refreshArtwork() { if (started) render(); }
+  void refreshArtwork() { artworkResolved = false; if (started) render(); }
   private void updateArtwork(MediaMetadata data) {
+    String identity = current == null ? "" : current.getPackageName() + "|" + metadata(data, MediaMetadata.METADATA_KEY_DISPLAY_TITLE, MediaMetadata.METADATA_KEY_TITLE) + "|" + metadata(data, MediaMetadata.METADATA_KEY_ARTIST, MediaMetadata.METADATA_KEY_ALBUM_ARTIST);
+    if (artworkResolved && identity.equals(artworkIdentity)) return;
+    artworkIdentity = identity; artworkResolved = true;
     Bitmap cover = null;
     if (data != null) {
       cover = data.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON);

@@ -199,6 +199,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         workspace.addObserver(self, selector: #selector(sleeping), name: NSWorkspace.willSleepNotification, object: nil)
         workspace.addObserver(self, selector: #selector(screenWoke), name: NSWorkspace.screensDidWakeNotification, object: nil)
         workspace.addObserver(self, selector: #selector(sleeping), name: NSWorkspace.screensDidSleepNotification, object: nil)
+        workspace.addObserver(self, selector: #selector(updateVideoVisibility), name: NSWorkspace.activeSpaceDidChangeNotification, object: nil)
+        workspace.addObserver(self, selector: #selector(updateVideoVisibility), name: NSWorkspace.didActivateApplicationNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(updateVideoVisibility), name: NSWindow.didChangeOcclusionStateNotification, object: nil)
         let distributed = DistributedNotificationCenter.default()
         distributed.addObserver(self, selector: #selector(unlocked), name: NSNotification.Name("com.apple.screenIsUnlocked"), object: nil)
         distributed.addObserver(self, selector: #selector(screenLocked), name: NSNotification.Name("com.apple.screenIsLocked"), object: nil)
@@ -298,6 +301,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         looper = AVPlayerLooper(player: queue, templateItem: AVPlayerItem(asset: middle), timeRange: .invalid, existingItemsOrdering: .loopingItemsFollowExistingItems)
         state = "open"
         player.play()
+        updateVideoVisibility()
     }
     @objc func closeCurtain() {
         guard !locked, ready, state != "closed", let closing = assets["closing"] else { return }
@@ -405,6 +409,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             saved.removeValue(forKey: key)
         }
         UserDefaults.standard.set(saved, forKey: "previousWallpapers")
+    }
+    @objc func updateVideoVisibility() {
+        guard !test, ready, !locked, state == "open" else { return }
+        if windows.contains(where: { $0.isVisible && $0.occlusionState.contains(.visible) }) {
+            if player.rate == 0 { player.play() }
+        } else { player.pause() }
     }
     @objc func sleeping() { player.pause() }
     @objc func showLauncher() { launcher.reveal() }

@@ -4,14 +4,14 @@ An independently implemented, minimalist Android launcher with the Arlecchino cu
 
 ## Install and setup
 
-Current source builds **Android 1.12** with `./scripts/build-android.sh`, producing `outputs/Arlecchino-Home-Android-1.12.apk`. Published APKs are available in [GitHub releases](https://github.com/tobyyu913/Arlecchino-Wallpaper/releases) and may be older than this branch. Requires Android 9 or later.
+Current source builds **Android 1.13** with `./scripts/build-android.sh`, producing `outputs/Arlecchino-Home-Android-1.13.apk`. Published APKs are available in [GitHub releases](https://github.com/tobyyu913/Arlecchino-Wallpaper/releases) and may be older than this branch. Requires Android 9 or later.
 
 1. Install the APK and open **Arlecchino Home**.
 2. Tap **Choose favorites** and select your home-screen apps.
 3. Tap **Make this your home screen** and confirm Arlecchino Home in Android's home-app picker.
 4. Tap **Enable curtain wallpaper** if the wallpaper is not already active, then confirm it in the system wallpaper picker.
 
-Version 1.12 updates the existing Arlecchino Wallpaper package using the same signing key. The old wallpaper-only APKs remain available in earlier releases. Installing this version does not automatically change the default launcher or grant notification access.
+Version 1.13 updates the existing Arlecchino Wallpaper package using the same signing key. The old wallpaper-only APKs remain available in earlier releases. Installing this version does not automatically change the default launcher or grant notification access.
 
 ## Home-screen workflow
 
@@ -85,3 +85,10 @@ Open Arlecchino settings → Import favorites and select a JSON file containing 
 Version 1.9 includes 58 app-specific AI-generated outline assets covering 59 packages (the CloudDrive app and its web shortcut share an identity). They supplement an installed icon pack only when that pack has no matching icon. The built-in outline mode also uses them where available. System-icon mode retains original app icons.
 
 The assets were generated with OpenAI's image-generation tool from original app-icon identity references, reviewed as monochrome masks and at small sizes, and bundled locally. Their alpha contours are rendered in the launcher's warm white ink with consistent bounds and aspect ratio. There is no AI request, API key, internet permission or generation delay on the phone. New, unrecognized packages still require an additional icon or icon-pack update.
+
+
+## Performance, 1.13
+
+Icon-pack parsing, image decoding and icon rasterization run on background workers. Recycled rows use tagged asynchronous requests so delayed results cannot replace another app's icon. The launcher keeps a bounded 192-icon cache and four recently visited gesture-section layouts, and caches alphabet grouping rather than repeating transliteration during sorting. Favorites departures reuse a half-resolution snapshot rather than allocating a full-display bitmap each time. Media health checks keep their existing session recovery but reuse unchanged artwork.
+
+Transition instrumentation also checks that neighboring-section visits reuse views and repeated departures reuse their snapshot. The tests run on an emulator; no phone testing or installation is required.

@@ -4,6 +4,13 @@ import SwiftUI
 struct DesktopApp: Identifiable {
     let url: URL
     let name: String
+    let bundleID: String
+    let section: String
+    init(url: URL, name: String, bundleID: String = "") {
+        self.url = url; self.name = name; self.bundleID = bundleID
+        let first = String(name.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current).uppercased().prefix(1))
+        section = first.count == 1 && first.utf8.first.map { $0 >= 65 && $0 <= 90 } == true ? first : "#"
+    }
     var id: String { url.path }
 }
 
@@ -19,14 +26,27 @@ final class LauncherModel: ObservableObject {
         }
     }
     deinit { if let observer = favoriteObserver { NotificationCenter.default.removeObserver(observer) } }
-    @Published var apps: [DesktopApp] = []
+    @Published var apps: [DesktopApp] = [] {
+        didSet {
+            appsByID = Dictionary(apps.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            sectionHeads.removeAll(keepingCapacity: true)
+            for app in apps where sectionHeads[app.section] == nil { sectionHeads[app.section] = app.id }
+        }
+    }
+    private var appsByID: [String: DesktopApp] = [:]
+    private var sectionHeads: [String: String] = [:]
+    private var lastRefresh = Date.distantPast
+    private var refreshing = false
+    var catalogUpdated: (([DesktopApp]) -> Void)?
     @Published var favorites: [String] = UserDefaults.standard.stringArray(forKey: "launcherFavorites") ?? []
     @Published var query = ""
     @Published var section = "★"
     @Published var icons = UserDefaults.standard.bool(forKey: "launcherOriginalIcons")
     private var iconCache: [String: NSImage] = [:]
     let alphabet = Array("★#ABCDEFGHIJKLMNOPQRSTUVWXYZ⚙").map(String.init)
-    func refresh() {
+    func refresh(force: Bool = false) {
+        guard !refreshing, force || Date().timeIntervalSince(lastRefresh) > 60 else { return }
+        refreshing = true
         DispatchQueue.global(qos: .userInitiated).async {
             let roots = ["/Applications", "/System/Applications", "/System/Applications/Utilities", "/System/Cryptexes/App/System/Applications", NSHomeDirectory() + "/Applications"]
             var found: [DesktopApp] = []
@@ -40,17 +60,19 @@ final class LauncherModel: ObservableObject {
                     let key = bundle?.bundleIdentifier ?? url.path
                     guard seen.insert(key).inserted else { continue }
                     let name = (bundle?.localizedInfoDictionary?["CFBundleDisplayName"] as? String) ?? (bundle?.infoDictionary?["CFBundleDisplayName"] as? String) ?? url.deletingPathExtension().lastPathComponent
-                    found.append(DesktopApp(url: url, name: name))
+                    found.append(DesktopApp(url: url, name: name, bundleID: key))
                 }
             }
             let finderURL = URL(fileURLWithPath: "/System/Library/CoreServices/Finder.app")
-            if FileManager.default.fileExists(atPath: finderURL.path) { found.append(DesktopApp(url: finderURL, name: "Finder")) }
+            if FileManager.default.fileExists(atPath: finderURL.path) { found.append(DesktopApp(url: finderURL, name: "Finder", bundleID: "com.apple.finder")) }
             let sorted = found.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
             DispatchQueue.main.async {
-                self.apps = sorted
+                self.refreshing = false; self.lastRefresh = Date()
+                if self.apps.map({ $0.id + $0.name }) != sorted.map({ $0.id + $0.name }) { self.apps = sorted }
+                self.catalogUpdated?(self.apps)
                 if UserDefaults.standard.object(forKey: "launcherFavorites") == nil {
                     let defaults = ["com.apple.Safari", "com.apple.mail", "com.apple.MobileSMS", "com.apple.finder", "com.apple.systempreferences"]
-                    self.favorites = defaults.compactMap { id in sorted.first { Bundle(url: $0.url)?.bundleIdentifier == id }?.id }
+                    self.favorites = defaults.compactMap { id in sorted.first { $0.bundleID == id }?.id }
                     self.save()
                 }
             }
@@ -65,13 +87,11 @@ final class LauncherModel: ObservableObject {
         else { favorites.append(app.id) }
         save()
     }
-    func letter(_ app: DesktopApp) -> String {
-        let first = String(app.name.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current).uppercased().prefix(1))
-        return first.range(of: "^[A-Z]$", options: .regularExpression) != nil ? first : "#"
-    }
+    func letter(_ app: DesktopApp) -> String { app.section }
+    func isSectionHead(_ app: DesktopApp) -> Bool { sectionHeads[app.section] == app.id }
     var visible: [DesktopApp] {
         if !query.isEmpty { return apps.filter { $0.name.localizedCaseInsensitiveContains(query) } }
-        if section == "★" { return favorites.compactMap { id in apps.first { $0.id == id } } }
+        if section == "★" { return favorites.compactMap { appsByID[$0] } }
         return apps
     }
     func image(_ app: DesktopApp) -> NSImage {
@@ -88,7 +108,7 @@ final class LauncherModel: ObservableObject {
     }()
     func minimalIconURL(_ app: DesktopApp) -> URL? {
         let name = app.name.lowercased().filter { $0.isASCII && ($0.isLetter || $0.isNumber) }
-        let bundle = Bundle(url: app.url)?.bundleIdentifier ?? ""
+        let bundle = app.bundleID
         guard let file = Self.minimalMap["bundles"]?[bundle] ?? Self.minimalMap["names"]?[name] else { return nil }
         return Bundle.main.resourceURL?.appendingPathComponent("MinimalIcons").appendingPathComponent(file)
     }
@@ -125,7 +145,6 @@ struct LauncherBackdrop: View {
 struct LauncherView: View {
     @ObservedObject var model: LauncherModel
     @ObservedObject var presentation = LauncherPresentation()
-    @State private var hover: String?
     @State private var railPosition: CGFloat?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var searching: Bool
@@ -160,24 +179,10 @@ struct LauncherView: View {
                                     Text(model.query.isEmpty ? "Add favorites from All apps.\nRight-click an app to pin it here." : "No matching apps").font(.system(size: 13)).foregroundStyle(.white.opacity(0.5)).padding(.vertical, 20)
                                 }
                                 ForEach(model.visible) { app in
-                                    if model.section != "★" && model.query.isEmpty && model.apps.first(where: { model.letter($0) == model.letter(app) })?.id == app.id {
+                                    if model.section != "★" && model.query.isEmpty && model.isSectionHead(app) {
                                         Text(model.letter(app)).font(.system(size: 13, weight: .medium)).foregroundStyle(Color(red: 0.83, green: 0.36, blue: 0.38)).padding(.top, 12).padding(.bottom, 5).id(model.letter(app))
                                     }
-                                    Button { model.launch(app) } label: {
-                                        HStack(spacing: 14) {
-                                            Image(nsImage: model.icons ? model.image(app) : model.minimalistImage(app))
-                                                .resizable().interpolation(.high).frame(width: 32, height: 32)
-                                            Text(app.name).font(.system(size: 17, weight: .regular)).lineLimit(1)
-                                            Spacer(minLength: 0)
-                                        }.padding(.horizontal, 10).padding(.vertical, 10).contentShape(Rectangle())
-                                            .background(.white.opacity(hover == app.id ? 0.09 : 0), in: RoundedRectangle(cornerRadius: 10))
-                                            .offset(x: hover == app.id ? 3 : 0)
-                                    }.buttonStyle(.plain).id(app.id).onHover { hover = $0 ? app.id : nil }
-                                        .animation(.easeOut(duration: 0.14), value: hover)
-                                        .contextMenu {
-                                            Button(model.favorites.contains(app.id) ? "Remove from Favorites" : "Add to Favorites") { model.toggle(app) }
-                                            Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([app.url]) }
-                                        }
+                                    LauncherAppRow(app: app, image: model.icons ? model.image(app) : model.minimalistImage(app), favorite: model.favorites.contains(app.id), launch: { model.launch(app) }, toggle: { model.toggle(app) }).equatable().id(app.id)
                                 }
                             }.padding(.trailing, 6)
                         }.scrollIndicators(.hidden)
@@ -221,6 +226,7 @@ struct LauncherView: View {
                                         if ended { appDelegate.showPreferences() }
                                         return
                                     }
+                                    if model.section == letter && model.query.isEmpty { return }
                                     select(letter)
                                     if letter != "★" {
                                         DispatchQueue.main.async { let target = model.apps.first { model.letter($0) >= letter && model.letter($0) != "#" }.map { model.letter($0) } ?? model.apps.last.map { model.letter($0) } ?? letter
@@ -249,8 +255,35 @@ struct LauncherView: View {
             .onExitCommand { model.query = ""; searching = false; appDelegate.launcher.dismiss() }
     }
     func select(_ letter: String) {
-        model.query = ""
-        model.section = letter
+        if !model.query.isEmpty { model.query = "" }
+        if model.section != letter { model.section = letter }
+    }
+}
+
+struct LauncherAppRow: View, Equatable {
+    let app: DesktopApp
+    let image: NSImage
+    let favorite: Bool
+    let launch: () -> Void
+    let toggle: () -> Void
+    @State private var hovering = false
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.app.id == rhs.app.id && lhs.app.name == rhs.app.name && lhs.image === rhs.image && lhs.favorite == rhs.favorite
+    }
+    var body: some View {
+        Button(action: launch) {
+            HStack(spacing: 14) {
+                Image(nsImage: image).resizable().interpolation(.high).frame(width: 32, height: 32)
+                Text(app.name).font(.system(size: 17)).lineLimit(1)
+                Spacer(minLength: 0)
+            }.padding(.horizontal, 10).padding(.vertical, 10).contentShape(Rectangle())
+                .background(.white.opacity(hovering ? 0.09 : 0), in: RoundedRectangle(cornerRadius: 10))
+                .offset(x: hovering ? 3 : 0)
+        }.buttonStyle(.plain).onHover { hovering = $0 }.animation(.easeOut(duration: 0.14), value: hovering)
+            .contextMenu {
+                Button(favorite ? "Remove from Favorites" : "Add to Favorites", action: toggle)
+                Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([app.url]) }
+            }
     }
 }
 
@@ -352,6 +385,10 @@ final class DesktopLauncher {
     private let frontmostBundle: () -> String?
     init(frontmostBundle: @escaping () -> String? = { NSWorkspace.shared.frontmostApplication?.bundleIdentifier }) {
         self.frontmostBundle = frontmostBundle
+        model.catalogUpdated = { [weak self] apps in
+            guard let self else { return }
+            if self.panelModel.apps.map({ $0.id + $0.name }) != apps.map({ $0.id + $0.name }) { self.panelModel.apps = apps }
+        }
     }
     var canSummon: Bool {
         let frontmost = frontmostBundle()
@@ -386,7 +423,7 @@ final class DesktopLauncher {
         menuTracking = false
     }
     var musicIsVisible: Bool {
-        let desktop = model.section == "★" && model.query.isEmpty && windows.contains { $0.isVisible }
+        let desktop = model.section == "★" && model.query.isEmpty && windows.contains { $0.isVisible && $0.occlusionState.contains(.visible) }
         let panel = summonedWindow?.isVisible == true && panelModel.section == "★" && panelModel.query.isEmpty
         return desktop || panel
     }
@@ -422,9 +459,9 @@ final class DesktopLauncher {
     func reveal(on screen: NSScreen? = nil) {
         guard !appDelegate.locked, canSummon else { return }
         guard let screen = screen ?? NSScreen.screens.first(where: { $0.frame.contains(NSEvent.mouseLocation) }) ?? NSScreen.main else { return }
-        panelModel.apps = model.apps
+        if panelModel.apps.map({ $0.id + $0.name }) != model.apps.map({ $0.id + $0.name }) { panelModel.apps = model.apps }
         panelModel.icons = model.icons
-        panelModel.refresh()
+        model.refresh()
         if summonedWindow == nil {
             summonedWindow = LauncherWindow(screen: screen, model: panelModel, displayInitially: false)
 
