@@ -335,6 +335,9 @@ final class DesktopLauncher {
     private weak var summonedWindow: LauncherWindow?
     private var menuTracking = false
     private var menuObservers: [NSObjectProtocol] = []
+    var canSummon: Bool {
+        LauncherSummonPolicy.allows(frontmost: NSWorkspace.shared.frontmostApplication?.bundleIdentifier, ownBundle: Bundle.main.bundleIdentifier)
+    }
     func startEdgeTrigger() {
         stopEdgeTrigger()
         for (name, tracking) in [(NSMenu.didBeginTrackingNotification, true), (NSMenu.didEndTrackingNotification, false)] {
@@ -349,7 +352,7 @@ final class DesktopLauncher {
                self.departureGate.update(point: point, frame: window.frame, now: now, paused: self.menuTracking || NSEvent.pressedMouseButtons != 0 || appDelegate.locked) {
                 self.dismiss()
             }
-            let enabled = !appDelegate.locked && !self.menuTracking && !self.windows.contains(where: { $0.isVisible && $0.presentation.summoned }) && NSEvent.pressedMouseButtons == 0 && NSApp.modalWindow == nil && UserDefaults.standard.bool(forKey: "launcherEdgeTrigger")
+            let enabled = !appDelegate.locked && self.canSummon && !self.menuTracking && !self.windows.contains(where: { $0.isVisible && $0.presentation.summoned }) && NSEvent.pressedMouseButtons == 0 && NSApp.modalWindow == nil && UserDefaults.standard.bool(forKey: "launcherEdgeTrigger")
             if let index = self.edgeGate.update(point: NSEvent.mouseLocation, frames: screens.map(\.frame), now: ProcessInfo.processInfo.systemUptime, enabled: enabled) {
                 self.reveal(on: screens[index])
             }
@@ -383,14 +386,14 @@ final class DesktopLauncher {
         }
     }
     func toggle() {
-        if windows.contains(where: { $0.isVisible && !$0.isDismissing && ($0.presentation.summoned || $0.isKeyWindow) }) {
+        if windows.contains(where: { $0.isVisible && !$0.isDismissing && $0.presentation.summoned }) {
             dismiss()
         } else {
             reveal()
         }
     }
     func reveal(on screen: NSScreen? = nil) {
-        guard !appDelegate.locked else { return }
+        guard !appDelegate.locked, canSummon else { return }
         UserDefaults.standard.set(true, forKey: "launcherEnabled")
         if windows.isEmpty { rebuild() }
         model.refresh()
@@ -510,5 +513,14 @@ struct LauncherDepartureGate {
         if frame.insetBy(dx: -8, dy: -8).contains(point) { outsideSince = nil; return false }
         guard let start = outsideSince else { outsideSince = now; return false }
         return now - start >= 0.18
+    }
+}
+
+// Finder owns the desktop; its existing desktop launcher must not turn into a
+// second floating surface. Dismissal of an already summoned panel still works.
+enum LauncherSummonPolicy {
+    static func allows(frontmost: String?, ownBundle: String?) -> Bool {
+        guard let frontmost else { return false }
+        return frontmost != "com.apple.finder" && frontmost != ownBundle
     }
 }

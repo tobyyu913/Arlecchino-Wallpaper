@@ -69,7 +69,11 @@ DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
     precondition(!departure.update(point: CGPoint(x: 600, y: 400), frame: panel, now: 4, paused: false))
     precondition(!departure.update(point: CGPoint(x: 100, y: 400), frame: panel, now: 4.1, paused: false))
     precondition(!departure.update(point: CGPoint(x: 500, y: 400), frame: panel, now: 5, paused: false))
-    print("PASS: pointer departure grace, reentry, border tolerance and menu pause;  edge dwell, multi-display targeting, rearming and lock suppression;  wave peaks at cursor and relaxes symmetrically;  hover follows cursor without clicking;  stripe forwards native pixel scrolling; drag and release track pointer position")
+    precondition(!LauncherSummonPolicy.allows(frontmost: "com.apple.finder", ownBundle: "local.toby.curtainwallpaper"))
+    precondition(!LauncherSummonPolicy.allows(frontmost: "local.toby.curtainwallpaper", ownBundle: "local.toby.curtainwallpaper"))
+    precondition(LauncherSummonPolicy.allows(frontmost: "com.apple.Safari", ownBundle: "local.toby.curtainwallpaper"))
+    precondition(!LauncherSummonPolicy.allows(frontmost: nil, ownBundle: "local.toby.curtainwallpaper"))
+    print("PASS: desktop summon suppression;  pointer departure grace, reentry, border tolerance and menu pause;  edge dwell, multi-display targeting, rearming and lock suppression;  wave peaks at cursor and relaxes symmetrically;  hover follows cursor without clicking;  stripe forwards native pixel scrolling; drag and release track pointer position")
     exit(0)
 }
 application.run()
