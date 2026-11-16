@@ -8,7 +8,17 @@ struct DesktopApp: Identifiable {
 }
 
 final class LauncherModel: ObservableObject {
-    let music = LauncherMusic()
+    let music: LauncherMusic
+    private var favoriteObserver: NSObjectProtocol?
+    init(music: LauncherMusic = LauncherMusic()) {
+        self.music = music
+        favoriteObserver = NotificationCenter.default.addObserver(forName: Notification.Name("ArlecchinoFavoritesChanged"), object: nil, queue: .main) { [weak self] _ in
+            guard let self else { return }
+            let saved = UserDefaults.standard.stringArray(forKey: "launcherFavorites") ?? []
+            if self.favorites != saved { self.favorites = saved }
+        }
+    }
+    deinit { if let observer = favoriteObserver { NotificationCenter.default.removeObserver(observer) } }
     @Published var apps: [DesktopApp] = []
     @Published var favorites: [String] = UserDefaults.standard.stringArray(forKey: "launcherFavorites") ?? []
     @Published var query = ""
@@ -46,7 +56,10 @@ final class LauncherModel: ObservableObject {
             }
         }
     }
-    func save() { UserDefaults.standard.set(favorites, forKey: "launcherFavorites") }
+    func save() {
+        UserDefaults.standard.set(favorites, forKey: "launcherFavorites")
+        NotificationCenter.default.post(name: Notification.Name("ArlecchinoFavoritesChanged"), object: self)
+    }
     func toggle(_ app: DesktopApp) {
         if favorites.contains(app.id) { favorites.removeAll { $0 == app.id } }
         else { favorites.append(app.id) }
@@ -247,7 +260,7 @@ final class LauncherWindow: NSPanel {
     private var transition = 0
     private(set) var isDismissing = false
     private(set) var isTransitioning = false
-    init(screen: NSScreen, model: LauncherModel) {
+    init(screen: NSScreen, model: LauncherModel, displayInitially: Bool = true) {
         restingFrame = Self.launcherFrame(screen)
         super.init(contentRect: restingFrame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.desktopIconWindow)) + 1)
@@ -259,7 +272,7 @@ final class LauncherWindow: NSPanel {
         acceptsMouseMovedEvents = true
         isReleasedWhenClosed = false
         contentView = NSHostingView(rootView: LauncherView(model: model, presentation: presentation))
-        orderFrontRegardless()
+        if displayInitially { orderFrontRegardless() }
     }
     static func launcherFrame(_ screen: NSScreen) -> NSRect {
         let visible = screen.visibleFrame
@@ -328,15 +341,22 @@ final class LauncherWindow: NSPanel {
 
 final class DesktopLauncher {
     let model = LauncherModel()
+    lazy var panelModel = LauncherModel(music: model.music)
     var windows: [LauncherWindow] = []
     private var edgeTimer: Timer?
     private var edgeGate = LauncherEdgeGate()
     private var departureGate = LauncherDepartureGate()
-    private weak var summonedWindow: LauncherWindow?
+    private(set) var summonedWindow: LauncherWindow?
     private var menuTracking = false
     private var menuObservers: [NSObjectProtocol] = []
+    private let frontmostBundle: () -> String?
+    init(frontmostBundle: @escaping () -> String? = { NSWorkspace.shared.frontmostApplication?.bundleIdentifier }) {
+        self.frontmostBundle = frontmostBundle
+    }
     var canSummon: Bool {
-        LauncherSummonPolicy.allows(frontmost: NSWorkspace.shared.frontmostApplication?.bundleIdentifier, ownBundle: Bundle.main.bundleIdentifier)
+        let frontmost = frontmostBundle()
+        if frontmost == Bundle.main.bundleIdentifier, summonedWindow?.isVisible == true, summonedWindow?.isDismissing == true { return true }
+        return LauncherSummonPolicy.allows(frontmost: frontmost, ownBundle: Bundle.main.bundleIdentifier)
     }
     func startEdgeTrigger() {
         stopEdgeTrigger()
@@ -352,7 +372,7 @@ final class DesktopLauncher {
                self.departureGate.update(point: point, frame: window.frame, now: now, paused: self.menuTracking || NSEvent.pressedMouseButtons != 0 || appDelegate.locked) {
                 self.dismiss()
             }
-            let enabled = !appDelegate.locked && self.canSummon && !self.menuTracking && !self.windows.contains(where: { $0.isVisible && $0.presentation.summoned }) && NSEvent.pressedMouseButtons == 0 && NSApp.modalWindow == nil && UserDefaults.standard.bool(forKey: "launcherEdgeTrigger")
+            let enabled = !appDelegate.locked && self.canSummon && !self.menuTracking && !(self.summonedWindow?.isVisible == true && self.summonedWindow?.presentation.summoned == true) && NSEvent.pressedMouseButtons == 0 && NSApp.modalWindow == nil && UserDefaults.standard.bool(forKey: "launcherEdgeTrigger")
             if let index = self.edgeGate.update(point: NSEvent.mouseLocation, frames: screens.map(\.frame), now: ProcessInfo.processInfo.systemUptime, enabled: enabled) {
                 self.reveal(on: screens[index])
             }
@@ -364,6 +384,16 @@ final class DesktopLauncher {
         edgeTimer?.invalidate(); edgeTimer = nil
         menuObservers.forEach { NotificationCenter.default.removeObserver($0) }; menuObservers.removeAll()
         menuTracking = false
+    }
+    var musicIsVisible: Bool {
+        let desktop = model.section == "★" && model.query.isEmpty && windows.contains { $0.isVisible }
+        let panel = summonedWindow?.isVisible == true && panelModel.section == "★" && panelModel.query.isEmpty
+        return desktop || panel
+    }
+    func hideForLock() {
+        windows.forEach { $0.orderOut(nil) }
+        summonedWindow?.close(); summonedWindow = nil
+        departureGate = LauncherDepartureGate()
     }
     func rebuild(locked: Bool = false) {
         windows.forEach { $0.close() }; windows.removeAll()
@@ -379,14 +409,11 @@ final class DesktopLauncher {
         }
     }
     func dismiss() {
-        summonedWindow = nil
         departureGate = LauncherDepartureGate()
-        windows.forEach { window in
-            window.dismissAnimated()
-        }
+        summonedWindow?.dismissAnimated()
     }
     func toggle() {
-        if windows.contains(where: { $0.isVisible && !$0.isDismissing && $0.presentation.summoned }) {
+        if let window = summonedWindow, window.isVisible && !window.isDismissing && window.presentation.summoned {
             dismiss()
         } else {
             reveal()
@@ -394,19 +421,26 @@ final class DesktopLauncher {
     }
     func reveal(on screen: NSScreen? = nil) {
         guard !appDelegate.locked, canSummon else { return }
-        UserDefaults.standard.set(true, forKey: "launcherEnabled")
-        if windows.isEmpty { rebuild() }
-        model.refresh()
+        guard let screen = screen ?? NSScreen.screens.first(where: { $0.frame.contains(NSEvent.mouseLocation) }) ?? NSScreen.main else { return }
+        panelModel.apps = model.apps
+        panelModel.icons = model.icons
+        panelModel.refresh()
+        if summonedWindow == nil {
+            summonedWindow = LauncherWindow(screen: screen, model: panelModel, displayInitially: false)
+
+        }
+        guard let window = summonedWindow else { return }
+        let frame = LauncherWindow.launcherFrame(screen)
+        if window.restingFrame != frame {
+            window.restingFrame = frame
+            if !window.isTransitioning { window.setFrame(frame, display: false) }
+        }
         NSApp.unhide(nil)
         NSApp.activate(ignoringOtherApps: true)
-        let screen = screen ?? NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) }
-        let index = screen.flatMap { target in NSScreen.screens.firstIndex { $0.frame == target.frame } } ?? 0
-        guard windows.indices.contains(index) else { return }
-        let window = windows[index]
-        summonedWindow = window
         departureGate = LauncherDepartureGate()
         window.summonAnimated()
     }
+
 }
 
 // Route trackpad/wheel events to the same native scroll view as the app list.

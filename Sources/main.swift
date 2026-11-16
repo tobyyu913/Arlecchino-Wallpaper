@@ -187,7 +187,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         buildMenu()
         launcher.model.music.shouldPoll = { [weak self] in
             guard let self else { return false }
-            return !self.locked && self.launcher.model.section == "★" && self.launcher.model.query.isEmpty && self.launcher.windows.contains { $0.isVisible }
+            return !self.locked && self.launcher.musicIsVisible
         }
         if !test { launcher.model.refresh(); launcher.rebuild(); launcher.startEdgeTrigger(); launcher.model.music.start() }
         registerShortcuts()
@@ -322,7 +322,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func screenWoke() { woke() }
     @objc func screenLocked() {
         locked = true
-        launcher.windows.forEach { $0.orderOut(nil) }
+        launcher.hideForLock()
         player.pause()
         windows.forEach { $0.surface.setLocked(true) }
         if !test { applyLockBackground() }

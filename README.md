@@ -35,7 +35,7 @@ The app is locally ad-hoc signed. This repository does not include a Developer I
 - **Control–Option–Command–Q:** close the curtain. Settings also offers C or Space as the final key.
 - **Control–Option–Command–O:** open or replay the curtain.
 - **Control–Option–Command–L:** toggle the launcher open or closed, with native Liquid Glass on macOS 26+ (translucent material on earlier systems). Returning to the desktop restores its dark background. Escape dismisses it; the shortcut brings it back. Selecting an app returns the launcher to the desktop layer.
-- Summoning is suppressed while Finder/the desktop or Arlecchino itself is foreground. The desktop launcher stays in its normal desktop layer; the shortcut still dismisses a summoned panel.
+- Summoning is suppressed while Finder/the desktop or Arlecchino itself is foreground. The desktop launcher and summoned panel use separate windows and independent search/alphabet navigation, sharing favorites and music. Dismissing the summoned panel leaves the desktop launcher visible. The desktop launcher stays in its normal desktop layer; the shortcut still dismisses a summoned panel.
 - **Left screen edge:** move the cursor to the extreme left edge of a display to summon the launcher on that display. Summoning and dismissal use short fade-and-slide transitions (a fade only with Reduce Motion). The summoned launcher dismisses when the pointer leaves it after entering, with a short grace period; menus and dragging pause dismissal. A brief dwell filters accidental crossings; leave the edge before triggering it again. Disable this in Settings if desired. No Accessibility or Input Monitoring permission is needed.
 - **Show desktop launcher:** enable or hide the launcher in Settings.
 - **Use original application icons:** switch between the downloaded [Minimalist Monochrome Mac Icons](https://github.com/amanchokshi/minimalist-monochrome-mac-icons) by Aman Chokshi (MIT) and original app icons. The downloaded pack uses app-specific designs; apps without a matching design retain their original icons. Pack source and license are bundled in `Resources/MinimalIcons/`.
@@ -89,6 +89,10 @@ xcrun swiftc Sources/LauncherMusic.swift Tests/LauncherMusic/main.swift \
   -module-cache-path work/build/ModuleCache -framework AppKit -framework SwiftUI \
   -o work/tests/launcher-music
 work/tests/launcher-music
+xcrun swiftc Sources/LauncherMusic.swift Sources/Launcher.swift Tests/LauncherWindows/main.swift \
+  -module-cache-path work/build/ModuleCache -framework AppKit -framework SwiftUI \
+  -o work/tests/launcher-windows
+work/tests/launcher-windows
 ```
 
 Geometry checks cover 12 display sizes, three layout modes, negative/offset screen origins, character visibility, and aspect-ratio preservation. Window lifecycle checks verify that 100 redundant display events preserve the same window instances and cover monitor hot-plug, reordering, and removal. Physical display hot-plug and secure lock-screen behavior need testing on the target Mac.
