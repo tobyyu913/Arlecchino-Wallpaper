@@ -50,6 +50,8 @@ public final class HomeActivity extends Activity {
   private ListView list;
   private LinearLayout homeHeader;
   private MusicPlayerView musicPlayer;
+  private DuoStatusView duoStatus;
+  private boolean statusTouchStream;
   private TextView clock, date;
   private EditText search;
   private Alphabet rail;
@@ -60,6 +62,9 @@ public final class HomeActivity extends Activity {
   private AppsAdapter adapter;
   private boolean all, searching, dead, registered, showIcons = true;
   private int generation, topInset, bottomInset, edgePointer = -1;
+  private int gestureLeft, gestureRight, gestureBottom;
+  private boolean systemGestureStream;
+  private Object backCallback;
   private float downX, downY;
   private Row downRow;
   private boolean edgeGesture, intercepted;
@@ -176,6 +181,7 @@ public final class HomeActivity extends Activity {
     getWindow().addFlags(WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER);
     getWindow().setBackgroundDrawableResource(android.R.color.transparent);
     if (Build.VERSION.SDK_INT >= 30) getWindow().setDecorFitsSystemWindows(false);
+    else getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
     getWindow().setStatusBarColor(Color.TRANSPARENT);
     getWindow().setNavigationBarColor(Color.TRANSPARENT);
     getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
@@ -307,6 +313,9 @@ public final class HomeActivity extends Activity {
     sp.leftMargin = dp(40);
     sp.rightMargin = dp(40);
     root.addView(search, sp);
+    duoStatus = new DuoStatusView(this, this::settings);
+    FrameLayout.LayoutParams initialStatusParams = new FrameLayout.LayoutParams(dp(56), dp(84), Gravity.TOP | Gravity.RIGHT);
+    root.addView(duoStatus, initialStatusParams);
     search.addTextChangedListener(
         new TextWatcher() {
           public void beforeTextChanged(CharSequence s, int a, int c, int f) {}
@@ -340,19 +349,35 @@ public final class HomeActivity extends Activity {
         topInset = insets.getSystemWindowInsetTop();
         bottomInset = insets.getSystemWindowInsetBottom();
       }
+      gestureLeft = gestureRight = gestureBottom = 0;
+      if (Build.VERSION.SDK_INT >= 29) {
+        Insets gestures = insets.getSystemGestureInsets();
+        Insets mandatory = insets.getMandatorySystemGestureInsets();
+        gestureLeft = Math.max(gestures.left, mandatory.left);
+        gestureRight = Math.max(gestures.right, mandatory.right);
+        gestureBottom = Math.max(gestures.bottom, mandatory.bottom);
+      }
       FrameLayout.LayoutParams p = (FrameLayout.LayoutParams) search.getLayoutParams();
       p.topMargin = topInset + dp(14);
+      p.rightMargin = prefs.getBoolean("duoStatus", true) ? Math.max(dp(40), dp(74) + gestureRight) : dp(40);
       search.setLayoutParams(p);
       list.setPadding(
-          dp(48), topInset + (searching ? dp(84) : 0), dp(64), Math.max(bottomInset, ime) + dp(24));
+          Math.max(dp(48), gestureLeft + dp(12)), topInset + (searching ? dp(84) : 0),
+          Math.max(dp(64), gestureRight + dp(32)), Math.max(Math.max(bottomInset, gestureBottom), ime) + dp(24));
+      FrameLayout.LayoutParams statusParams = (FrameLayout.LayoutParams)duoStatus.getLayoutParams();
+      statusParams.topMargin = Math.max(topInset, dp(8));
+      statusParams.rightMargin = Math.max(dp(12), gestureRight + dp(6));
+      duoStatus.setLayoutParams(statusParams);
       rail.invalidate();
       return insets;
     });
     setContentView(root);
+    backCallback = BackNavigation.register(this, this::home);
     setDim();
     root.requestFocus();
     root.requestApplyInsets();
     updateClock();
+    applyStatusBarMode();
     IntentFilter pkg = new IntentFilter(Intent.ACTION_PACKAGE_ADDED);
     pkg.addAction(Intent.ACTION_PACKAGE_REMOVED);
     pkg.addAction(Intent.ACTION_PACKAGE_CHANGED);
@@ -387,12 +412,17 @@ public final class HomeActivity extends Activity {
   protected void onResume() {
     super.onResume();
     updateClock();
+    if (root != null) root.requestApplyInsets();
+    if (duoStatus != null) { applyStatusBarMode(); if (prefs.getBoolean("duoStatus", true)) duoStatus.start(); }
     if (musicPlayer != null) musicPlayer.start();
     if (adapter != null) adapter.notifyDataSetChanged();
   }
 
   @Override
   protected void onPause() {
+    settleNavigationTransition();
+    if (duoStatus != null) duoStatus.stop();
+    setNativeStatusBarHidden(false);
     if (musicPlayer != null) musicPlayer.stop();
     super.onPause();
   }
@@ -515,7 +545,7 @@ public final class HomeActivity extends Activity {
 
   private void home() {
     cancelFavoritesDeparture();
-    if (rail != null) rail.dragging = false;
+    if (rail != null) rail.cancelInteraction();
     previewTransition++;
     gestureLayer.animate().cancel();
     gestureLayer.setVisibility(View.GONE);
@@ -1085,7 +1115,8 @@ public final class HomeActivity extends Activity {
             "Default home app",
             "System settings",
             "Import favorites",
-            "Music player");
+            "Music player",
+            "Duo status bar: " + (prefs.getBoolean("duoStatus", true) ? "on" : "off"));
     sheet(
         "Arlecchino settings",
         labels,
@@ -1129,6 +1160,12 @@ public final class HomeActivity extends Activity {
               break;
             case 8:
               startActivity(new Intent(Settings.ACTION_SETTINGS));
+              break;
+            case 11:
+              boolean statusEnabled = !prefs.getBoolean("duoStatus", true);
+              prefs.edit().putBoolean("duoStatus", statusEnabled).apply();
+              if (statusEnabled) duoStatus.start(); else duoStatus.stop();
+              applyStatusBarMode(); root.requestApplyInsets();
               break;
             case 10:
               new AlertDialog.Builder(this).setTitle("Music player")
@@ -1304,6 +1341,8 @@ public final class HomeActivity extends Activity {
   @Override
   protected void onDestroy() {
     dead = true;
+    if (duoStatus != null) duoStatus.stop();
+    BackNavigation.unregister(this, backCallback);
     cancelFavoritesDeparture();
     if (musicPlayer != null) musicPlayer.stop();
     if (registered) unregisterReceiver(changes);
@@ -1316,32 +1355,82 @@ public final class HomeActivity extends Activity {
     super.onDestroy();
   }
 
+  private void applyStatusBarMode() {
+    boolean enabled = prefs.getBoolean("duoStatus", true);
+    duoStatus.setVisibility(enabled ? View.VISIBLE : View.GONE);
+    setNativeStatusBarHidden(enabled);
+    root.post(() -> { if (!dead && hasWindowFocus()) setNativeStatusBarHidden(prefs.getBoolean("duoStatus", true)); });
+  }
+
+  private void setNativeStatusBarHidden(boolean hidden) {
+    if (hidden) {
+      getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN);
+      getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+    } else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+    if (Build.VERSION.SDK_INT >= 30) {
+      WindowInsetsController controller = getWindow().getInsetsController();
+      if (controller != null) {
+        controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+        if (hidden) controller.hide(WindowInsets.Type.statusBars());
+        else controller.show(WindowInsets.Type.statusBars());
+      }
+    }
+  }
+
+  @Override public void onWindowFocusChanged(boolean focus) {
+    super.onWindowFocusChanged(focus);
+    if (focus && duoStatus != null) applyStatusBarMode();
+  }
+
+  private void settleNavigationTransition() {
+    if (list == null || rail == null) return;
+    int position = all && previewIndex > 0 ? rail.anchor(previewIndex) + list.getHeaderViewsCount() : -1;
+    int offset = Math.round(previewTop) - list.getPaddingTop();
+    cancelFavoritesDeparture();
+    previewTransition++; previewIndex = -1;
+    gestureLayer.animate().cancel();
+    gestureLayer.setVisibility(View.GONE); gestureLayer.setAlpha(1); gestureLayer.setTranslationY(0);
+    list.animate().cancel(); list.setAlpha(1);
+    if (position >= 0) list.setSelectionFromTop(position, offset);
+    rail.cancelInteraction();
+    edgeGesture = false; edgePointer = -1; intercepted = false; systemGestureStream = false;
+  }
+
   @Override
   public boolean dispatchTouchEvent(MotionEvent e) {
     if (e.getActionMasked() == MotionEvent.ACTION_DOWN) {
       downX = e.getX();
       downY = e.getY();
       intercepted = false;
+      statusTouchStream = duoStatus != null && duoStatus.getVisibility() == View.VISIBLE
+          && downX >= duoStatus.getLeft() && downX < duoStatus.getRight() && downY >= duoStatus.getTop() && downY < duoStatus.getBottom();
+      systemGestureStream = downY < topInset || NavigationZones.systemStart(downX, downY, root.getWidth(), root.getHeight(), gestureLeft, gestureRight, Math.max(bottomInset, gestureBottom));
       downRow = null;
       int rowPosition =
           list.pointToPosition((int) e.getX() - list.getLeft(), (int) e.getY() - list.getTop())
               - list.getHeaderViewsCount();
       if (rowPosition >= 0 && rowPosition < rows.size()) downRow = rows.get(rowPosition);
-      edgeGesture = !searching && (downX < dp(20) || downX > root.getWidth() - dp(48));
+      edgeGesture = !searching && !statusTouchStream && !systemGestureStream && NavigationZones.alphabetStart(downX, downY, root.getWidth(), root.getHeight(), gestureLeft, gestureRight, Math.max(bottomInset, gestureBottom), dp(20), dp(48));
       if (edgeGesture) {
         edgePointer = e.getPointerId(0);
         rail.touch(e.getX(), e.getY(), e.getActionMasked());
         return true;
       }
     }
+    if (systemGestureStream || statusTouchStream) {
+      if (e.getActionMasked() == MotionEvent.ACTION_UP || e.getActionMasked() == MotionEvent.ACTION_CANCEL) { systemGestureStream = false; statusTouchStream = false; }
+      return super.dispatchTouchEvent(e);
+    }
+    if (e.getActionMasked() == MotionEvent.ACTION_CANCEL && edgeGesture) {
+      settleNavigationTransition();
+      return true;
+    }
     if (edgeGesture) {
       int action = e.getActionMasked(), pointer = e.findPointerIndex(edgePointer);
       boolean pointerLifted = action == MotionEvent.ACTION_POINTER_UP
           && e.getPointerId(e.getActionIndex()) == edgePointer;
       if (pointer < 0 || pointerLifted) {
-        rail.touch(rail.rawX, rail.rawY, MotionEvent.ACTION_CANCEL);
-        edgeGesture = false;
-        edgePointer = -1;
+        settleNavigationTransition();
         // Consume the rest of this stream; it never began in the list.
         intercepted = true;
       } else if (action == MotionEvent.ACTION_MOVE || action == MotionEvent.ACTION_UP
@@ -1601,7 +1690,7 @@ public final class HomeActivity extends Activity {
         group.addView(adapter.getView(i, null, group), new LinearLayout.LayoutParams(-1, -2));
       gestureGroups.put(index, group);
     }
-    int width = Math.max(dp(100), root.getWidth() - dp(112));
+    int width = Math.max(dp(100), root.getWidth() - list.getPaddingLeft() - list.getPaddingRight());
     group.measure(
         View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
         View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
@@ -1612,12 +1701,12 @@ public final class HomeActivity extends Activity {
     height =
         Math.min(
             group.getMeasuredHeight(),
-            Math.max(dp(80), root.getHeight() - bottomInset - dp(24) - Math.round(previewTop)));
+            Math.max(dp(80), root.getHeight() - Math.max(bottomInset, gestureBottom) - dp(24) - Math.round(previewTop)));
     gestureScroll.removeAllViews();
     gestureScroll.addView(group);
     gestureScroll.scrollTo(0, 0);
     FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(width, height);
-    params.leftMargin = dp(48);
+    params.leftMargin = list.getPaddingLeft();
     params.topMargin = Math.round(previewTop);
     gestureScroll.setLayoutParams(params);
     if (fadeIn) {
@@ -1701,7 +1790,7 @@ public final class HomeActivity extends Activity {
     }
 
     float baseStep() {
-      return Math.max(1, (getHeight() - baseStart() - bottomInset - dp(36)) / (letters.length() - 1));
+      return Math.max(1, (getHeight() - baseStart() - Math.max(bottomInset, gestureBottom) - dp(36)) / (letters.length() - 1));
     }
 
     private void schedule() {
@@ -1722,7 +1811,7 @@ public final class HomeActivity extends Activity {
       for (int i = 0; i < letters.length(); i++) {
         float distance = i - focus,
             wave = selected < 0 ? 0 : (float) Math.exp(-distance * distance / 45) * strength;
-        float x = getWidth() - dp(30) - (dp(80) + handPull) * wave;
+        float x = getWidth() - Math.max(dp(30), gestureRight + dp(12)) - (dp(80) + handPull) * wave;
         float y = begin + step * (i + .5f);
         c.drawText(
             glyphs[i],
@@ -1731,7 +1820,7 @@ public final class HomeActivity extends Activity {
             paint);
       }
       if (selected >= 0 && strength > .01f) {
-        float x = getWidth() - dp(30) - (dp(115) + handPull) * strength;
+        float x = getWidth() - Math.max(dp(30), gestureRight + dp(12)) - (dp(115) + handPull) * strength;
         float y = begin + step * (Math.max(0, Math.min(letters.length() - 1, focus)) + .5f);
         paint.setColor(0xFFE45776);
         paint.setStyle(Paint.Style.FILL);
@@ -1811,6 +1900,12 @@ public final class HomeActivity extends Activity {
         lastFrame = 0;
         invalidate();
       }
+    }
+
+    void cancelInteraction() {
+      Choreographer.getInstance().removeFrameCallback(this);
+      posted = false; dragging = false; tracking = false; selected = -1; strength = 0; lastFrame = 0;
+      invalidate();
     }
 
     void touch(float x, float y, int action) {

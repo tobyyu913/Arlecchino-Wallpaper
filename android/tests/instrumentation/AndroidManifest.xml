@@ -3,4 +3,6 @@
 <application android:label="Arlecchino music tests"/>
 <instrumentation android:name="com.tobyyu.arlecchinowallpaper.MusicTests" android:targetPackage="com.tobyyu.arlecchinowallpaper"/>
 <instrumentation android:name="com.tobyyu.arlecchinowallpaper.TransitionTests" android:targetPackage="com.tobyyu.arlecchinowallpaper"/>
+<instrumentation android:name="com.tobyyu.arlecchinowallpaper.NavigationTests" android:targetPackage="com.tobyyu.arlecchinowallpaper"/>
+<instrumentation android:name="com.tobyyu.arlecchinowallpaper.DuoStatusTests" android:targetPackage="com.tobyyu.arlecchinowallpaper"/>
 </manifest>

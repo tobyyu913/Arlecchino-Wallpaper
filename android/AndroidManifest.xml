@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.tobyyu.arlecchinowallpaper" android:versionCode="16" android:versionName="1.13">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.tobyyu.arlecchinowallpaper" android:versionCode="18" android:versionName="1.15">
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-sdk android:minSdkVersion="28" android:targetSdkVersion="35" />
     <uses-feature android:name="android.software.live_wallpaper" android:required="true" />
     <queries>
@@ -11,7 +13,7 @@
     </queries>
     <application android:label="Arlecchino Home" android:theme="@android:style/Theme.Material.NoActionBar" android:icon="@drawable/icon" android:allowBackup="false" android:supportsRtl="true">
         <activity android:name=".MainActivity" android:exported="false" />
-        <activity android:name=".HomeActivity" android:label="Arlecchino Home" android:exported="true" android:launchMode="singleTask" android:excludeFromRecents="true" android:clearTaskOnLaunch="true">
+        <activity android:name=".HomeActivity" android:label="Arlecchino Home" android:enableOnBackInvokedCallback="true" android:exported="true" android:launchMode="singleTask" android:excludeFromRecents="true" android:clearTaskOnLaunch="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.HOME" />

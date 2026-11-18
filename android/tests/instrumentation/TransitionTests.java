@@ -27,8 +27,8 @@ public final class TransitionTests extends Instrumentation {
     main(()->{
       View root=view("root");float density=activity.getResources().getDisplayMetrics().density;
       float start=root.getHeight()*.29f;
-      float step=(root.getHeight()-start-(Integer)field("bottomInset")-36*density)/28;
-      float y=start+step*(index+.5f),x=root.getWidth()-8*density;
+      float step=(root.getHeight()-start-Math.max((Integer)field("bottomInset"),(Integer)field("gestureBottom"))-36*density)/28;
+      float y=start+step*(index+.5f),x=root.getWidth()-(Integer)field("gestureRight")-8*density;
       long time=SystemClock.uptimeMillis();
       MotionEvent event=MotionEvent.obtain(time,time,action,x,y,0);
       activity.dispatchTouchEvent(event);event.recycle();
