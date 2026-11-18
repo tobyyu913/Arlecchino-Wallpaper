@@ -187,14 +187,33 @@ final class DuoControlCenter extends Dialog {
     }
     @Override public void setPressed(boolean pressed){super.setPressed(pressed);animate().scaleX(pressed?.90f:1).scaleY(pressed?.90f:1).setDuration(100).start();}
   }
-  final class LevelSlider extends View {
+  final class LevelSlider extends FrameLayout {
     final String icon;final boolean isBrightness;float level;boolean dragging;
-    LevelSlider(String icon,String description,boolean brightness){super(activity);this.icon=icon;this.isBrightness=brightness;setContentDescription(description);setFocusable(true);setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_YES);}
-    void setLevel(float value){level=Math.max(0,Math.min(1,value));setContentDescription((isBrightness?"Brightness":"Volume")+" "+Math.round(level*100)+" percent");invalidate();}
+    private final View indicator;
+    LevelSlider(String icon,String description,boolean brightness) {
+      super(activity);this.icon=icon;this.isBrightness=brightness;
+      setWillNotDraw(false);setContentDescription(description);setFocusable(true);setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_YES);
+      indicator=new View(activity) {
+        @Override protected void onDraw(Canvas c) {
+          float d=activity.getResources().getDisplayMetrics().density;
+          c.save();c.translate(getWidth()/2f,getHeight()/2f);c.scale(d,d);
+          drawIcon(c,LevelSlider.this.icon,level>.25f?0xFF4C5059:Color.WHITE);c.restore();
+        }
+      };
+      indicator.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
+      addView(indicator,new FrameLayout.LayoutParams(-1,dp(56),Gravity.BOTTOM));
+    }
+    void setLevel(float value){level=Math.max(0,Math.min(1,value));setContentDescription((isBrightness?"Brightness":"Volume")+" "+Math.round(level*100)+" percent");invalidate();indicator.invalidate();}
     private void change(float value){setLevel(value);try{if(isBrightness){if(!settingsAccess()){dragging=false;return;}Settings.System.putInt(activity.getContentResolver(),Settings.System.SCREEN_BRIGHTNESS_MODE,Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL);Settings.System.putInt(activity.getContentResolver(),Settings.System.SCREEN_BRIGHTNESS,Math.max(4,Math.round(level*255)));}else if(audio!=null)audio.setStreamVolume(AudioManager.STREAM_MUSIC,Math.round(level*audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)),0);}catch(SecurityException ignored){refreshControls();}}
     @Override public boolean onTouchEvent(MotionEvent e){if(e.getActionMasked()==MotionEvent.ACTION_DOWN){if(isBrightness&&!Settings.System.canWrite(activity)){settingsAccess();return true;}dragging=true;getParent().requestDisallowInterceptTouchEvent(true);}if(e.getActionMasked()==MotionEvent.ACTION_DOWN||e.getActionMasked()==MotionEvent.ACTION_MOVE)change(1-e.getY()/getHeight());if(e.getActionMasked()==MotionEvent.ACTION_UP||e.getActionMasked()==MotionEvent.ACTION_CANCEL){dragging=false;getParent().requestDisallowInterceptTouchEvent(false);if(e.getActionMasked()==MotionEvent.ACTION_UP)performClick();}return true;}
     @Override public boolean performClick(){super.performClick();return true;}
-    @Override protected void onDraw(Canvas c){Paint p=new Paint(3);RectF bounds=new RectF(0,0,getWidth(),getHeight());Path clip=new Path();clip.addRoundRect(bounds,dp(38),dp(38),Path.Direction.CW);c.save();c.clipPath(clip);getGlass().setBounds(0,0,getWidth(),getHeight());getGlass().draw(c);p.setColor(0xF8FFFFFF);c.drawRect(0,getHeight()*(1-level),getWidth(),getHeight(),p);float d=activity.getResources().getDisplayMetrics().density;c.translate(getWidth()/2f,getHeight()-dp(28));c.scale(d,d);drawIcon(c,icon,level>.25?0xFF4C5059:Color.WHITE);c.restore();}
+    @Override protected void onDraw(Canvas c) {
+      super.onDraw(c);
+      Paint p=new Paint(3);RectF bounds=new RectF(0,0,getWidth(),getHeight());
+      Path clip=new Path();clip.addRoundRect(bounds,dp(38),dp(38),Path.Direction.CW);
+      int saved=c.save();c.clipPath(clip);getGlass().setBounds(0,0,getWidth(),getHeight());getGlass().draw(c);
+      p.setColor(0xF8FFFFFF);c.drawRect(0,getHeight()*(1-level),getWidth(),getHeight(),p);c.restoreToCount(saved);
+    }
     private Drawable surface;private Drawable getGlass(){if(surface==null)surface=glass(38);return surface;}
     @Override public void onInitializeAccessibilityNodeInfo(android.view.accessibility.AccessibilityNodeInfo info){super.onInitializeAccessibilityNodeInfo(info);info.setClassName(SeekBar.class.getName());info.setRangeInfo(android.view.accessibility.AccessibilityNodeInfo.RangeInfo.obtain(1,0,100,level*100));info.addAction(android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_PROGRESS);info.addAction(4096);info.addAction(8192);}
     @Override public boolean performAccessibilityAction(int action,Bundle args){if(action==android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_PROGRESS.getId()&&args!=null){change(args.getFloat(android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_PROGRESS_VALUE)/100);return true;}if(action==4096||action==8192){change(level+(action==4096?.05f:-.05f));return true;}return super.performAccessibilityAction(action,args);}

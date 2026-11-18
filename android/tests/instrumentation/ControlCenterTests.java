@@ -29,6 +29,14 @@ public final class ControlCenterTests extends Instrumentation {
     main(()->{session=new MediaSession(activity,"Control Center synthetic player");session.setCallback(new MediaSession.Callback(){@Override public void onPlay(){plays.incrementAndGet();session.setPlaybackState(state(PlaybackState.STATE_PLAYING));}@Override public void onPause(){pauses.incrementAndGet();session.setPlaybackState(state(PlaybackState.STATE_PAUSED));}@Override public void onSkipToNext(){next.incrementAndGet();}},new Handler(Looper.getMainLooper()));session.setMetadata(new MediaMetadata.Builder().putString(MediaMetadata.METADATA_KEY_TITLE,"Control Center Test").putString(MediaMetadata.METADATA_KEY_ARTIST,"Synthetic session").build());session.setPlaybackState(state(PlaybackState.STATE_PAUSED));session.setActive(true);});
     open();
     await(()->field(panel,"current")!=null,"Media session not connected");
+    SystemClock.sleep(1100);
+    main(()->{for(String name:new String[]{"brightness","volume"}){
+      View icon=(View)field(field(panel,name),"indicator");
+      android.graphics.Bitmap image=android.graphics.Bitmap.createBitmap(icon.getWidth(),icon.getHeight(),android.graphics.Bitmap.Config.ARGB_8888);
+      icon.draw(new android.graphics.Canvas(image));int ink=0;
+      for(int y=0;y<image.getHeight();y++)for(int x=0;x<image.getWidth();x++)if((image.getPixel(x,y)>>>24)>0)ink++;
+      if(ink<50)throw new AssertionError(name+" glyph missing after refresh");image.recycle();
+    }});
     progress("volume",60);await(()->audio.getStreamVolume(AudioManager.STREAM_MUSIC)==Math.round(audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)*.6f),"Volume slider did not control system media volume");
     progress("brightness",65);await(()->Settings.System.getInt(activity.getContentResolver(),Settings.System.SCREEN_BRIGHTNESS,0)==166,"Brightness did not change the system setting");
     call("transport",1);await(()->plays.get()==1,"Play control failed");call("transport",1);await(()->pauses.get()==1,"Pause control failed");call("transport",2);await(()->next.get()==1,"Next control failed");
