@@ -1377,6 +1377,11 @@ public final class HomeActivity extends Activity {
     }
   }
 
+  @Override public void onRequestPermissionsResult(int request, String[] permissions, int[] grants) {
+    super.onRequestPermissionsResult(request, permissions, grants);
+    if (duoStatus != null) duoStatus.permissionResult(request, grants);
+  }
+
   @Override public void onWindowFocusChanged(boolean focus) {
     super.onWindowFocusChanged(focus);
     if (focus && duoStatus != null) applyStatusBarMode();

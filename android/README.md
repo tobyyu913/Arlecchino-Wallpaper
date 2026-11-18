@@ -4,14 +4,14 @@ An independently implemented, minimalist Android launcher with the Arlecchino cu
 
 ## Install and setup
 
-Current source builds **Android 1.15** with `./scripts/build-android.sh`, producing `outputs/Arlecchino-Home-Android-1.15.apk`. Published APKs are available in [GitHub releases](https://github.com/tobyyu913/Arlecchino-Wallpaper/releases) and may be older than this branch. Requires Android 9 or later.
+Current source builds **Android 1.16** with `./scripts/build-android.sh`, producing `outputs/Arlecchino-Home-Android-1.16.apk`. Published APKs are available in [GitHub releases](https://github.com/tobyyu913/Arlecchino-Wallpaper/releases) and may be older than this branch. Requires Android 9 or later.
 
 1. Install the APK and open **Arlecchino Home**.
 2. Tap **Choose favorites** and select your home-screen apps.
 3. Tap **Make this your home screen** and confirm Arlecchino Home in Android's home-app picker.
 4. Tap **Enable curtain wallpaper** if the wallpaper is not already active, then confirm it in the system wallpaper picker.
 
-Version 1.15 updates the existing Arlecchino Wallpaper package using the same signing key. The old wallpaper-only APKs remain available in earlier releases. Installing this version does not automatically change the default launcher or grant notification access.
+Version 1.16 updates the existing Arlecchino Wallpaper package using the same signing key. The old wallpaper-only APKs remain available in earlier releases. Installing this version does not automatically change the default launcher or grant notification access.
 
 ## Home-screen workflow
 
@@ -29,13 +29,28 @@ Version 1.15 updates the existing Arlecchino Wallpaper package using the same si
 
 This is an independent implementation of the free-version workflow, with additional Arlecchino styling. See [reference checks](REFERENCE-CHECKS.md) for observed surfaces, matching behavior and test limits. It does not claim exhaustive or pixel-for-pixel Niagara parity. Pro-only widget/calendar/weather integrations and work-profile support are not implemented.
 
-## Duo-style status column, 1.15
+## Duo-style status column and Control Center, 1.16
 
-Enabled by default on the launcher: a small clock above a circular battery ring, Wi-Fi arcs and cellular dots. Tap it for live details and Android's Internet/battery settings shortcuts; long-press it for launcher settings. Use **Arlecchino settings → Duo status bar** to restore the normal Android status bar.
+Enabled by default on the launcher: a small clock above a circular battery ring, Wi-Fi arcs and cellular dots. Tap it for the glass Control Center; long-press it for launcher settings. On mobile data the center displays 5G, 4G, 3G or 2G from the reported radio/display information. Unknown generations show DATA, and disconnected radios show a dash instead of empty Wi-Fi arcs. Use **Arlecchino settings → Duo status bar** to restore the normal Android status bar.
 
-This is an independent Android rendering based on Apple's published iPhone Duo layout. It lives inside the launcher window, with no root, accessibility service or draw-over-other-apps permission. The normal status bar is hidden while this launcher is visible; other apps keep their own normal system bars. Android can temporarily reveal its bar for a top-edge swipe or system alert. This does not replace the lock-screen status bar or Android's Control Center/Quick Settings.
+This is an independent Android rendering based on Apple's published iPhone Duo layout. It lives inside the launcher window, with no root, accessibility service or draw-over-other-apps permission. The normal status bar is hidden while this launcher is visible; other apps keep their own normal system bars. Android can temporarily reveal its bar for a top-edge swipe or system alert. This does not replace the lock-screen status bar or system Quick Settings.
 
-Battery, charging, battery-saver, Wi-Fi and cellular readings update while Home is visible. Network/Wi-Fi access uses normal install-time permissions; no phone-state or location permission is requested, and no network requests are sent. Unavailable signal readings remain dim/unavailable rather than inventing a strength. Listeners and the expanded panel stop when Home goes into the background.
+Battery, charging, battery-saver, Wi-Fi and cellular readings update while Home is visible. Network/Wi-Fi and Android 13+ basic cellular-state access use normal install-time permissions. No dangerous phone-state or location permission is requested, and no network requests are sent. Android's display-info callback handles 5G NSA branding over LTE where available. The active data SIM is selected when Home resumes. Unknown/unsupported readings stay unavailable rather than inventing a generation. Listeners and the panel stop when Home goes into the background.
+
+The expanded layout uses connectivity/media tiles, circular utility controls and vertical brightness/volume sliders. It grows from the compact status indicator and collapses back with eased motion, respects disabled system animations, and dismisses with Back, the close control, an outside tap or an upward swipe near its bottom. Android 12+ supplies supported backdrop blur; launcher content also softens behind the panel. The grid scrolls when the display is too short.
+
+| Control | Android behavior |
+| --- | --- |
+| Media volume | Changes real media-stream volume; supports touch and accessibility adjustment. |
+| Brightness / rotation lock | Changes system settings after the user grants **Modify system settings** on first use. Brightness adjustment switches to manual brightness. |
+| Flashlight | Toggles the rear flash through CameraManager; asks for Camera permission only when tapped. No camera preview or recording is created. Unsupported/in-use flash reports that state. |
+| Play/pause, previous/next | Sends supported transport actions to the active media session using existing optional notification access; unavailable actions are dimmed. |
+| Silent | Toggles normal/vibrate where Android permits it; otherwise opens Sound settings. |
+| Wi-Fi / mobile data / Bluetooth / airplane mode | Opens Android's actual connectivity panel or settings because ordinary modern Android apps cannot directly toggle these radios. |
+| Focus / battery / cast / display | Opens the corresponding working Android system settings. |
+| Timer / calculator / camera | Opens the corresponding installed app or system action; missing handlers fall back to Settings. |
+
+The close button dismisses the panel; no nonfunctional power-off control is presented. Special permissions remain optional and are never enabled automatically on a physical phone.
 
 ## Android navigation gestures
 
@@ -84,7 +99,7 @@ java -cp work/android-tests com.tobyyu.arlecchinowallpaper.WakeCycleTest
 java -cp work/android-tests com.tobyyu.arlecchinowallpaper.AppIndexTest
 ```
 
-Run `./scripts/test-android-music.sh EMULATOR_SERIAL [ADB_PORT]` on a disposable emulator for real MediaSession callback/transport tests. It refuses physical devices because it grants notification access for synthetic test sessions. Pass `TransitionTests` as a third argument to check intermediate departure frames, synchronized fades, quick-release settling and canceling back to favorites. The music tests cover title/artist updates, play/pause, previous/next, resume, active-player changes and destroyed sessions. `NavigationTests` checks edge reservations, native Back, search dismissal, cancellation, Home and Recents. `DuoStatusTests` checks live battery data, expansion, native-bar hiding/restoration, background cleanup and returning Home. Both are emulator-only; the status suite temporarily sets and then resets an emulator battery fixture.
+Run `./scripts/test-android-music.sh EMULATOR_SERIAL [ADB_PORT]` on a disposable emulator for real MediaSession callback/transport tests. It refuses physical devices because it grants notification access for synthetic test sessions. Pass `TransitionTests` as a third argument to check intermediate departure frames, synchronized fades, quick-release settling and canceling back to favorites. The music tests cover title/artist updates, play/pause, previous/next, resume, active-player changes and destroyed sessions. `NavigationTests` checks edge reservations, native Back, search dismissal, cancellation, Home and Recents. `DuoStatusTests` checks live battery data, expansion, native-bar hiding/restoration, background cleanup and returning Home. `ControlCenterTests` exercises actual volume/brightness/rotation changes, media transport commands, native Back dismissal, system-panel handoff and cleanup. These suites are emulator-only; the status suite temporarily sets and then resets an emulator battery fixture.
 
 Wake tests cover missed/duplicate/rapid wake events, decode cancellation, replaced surfaces, timeouts, and returning home. App-index tests cover sorting and search.
 
