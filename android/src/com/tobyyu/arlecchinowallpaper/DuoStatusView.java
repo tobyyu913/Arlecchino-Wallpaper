@@ -27,7 +27,6 @@ final class DuoStatusView extends View {
   private volatile boolean started;
   private boolean networkRegistered, signalRegistered, wifiConnected, charging, airplane, saver;
   private int battery = -1, wifiLevel = -1, cellLevel = -1;
-  private DuoControlCenter popup;
   private Object mobileCallback;
   private boolean mobileConnected;
   private int networkType, networkOverride;
@@ -58,8 +57,7 @@ final class DuoStatusView extends View {
     connectivity = activity.getSystemService(ConnectivityManager.class);
     wifi = (WifiManager)activity.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
     baseTelephony = activity.getSystemService(TelephonyManager.class); telephony = baseTelephony;
-    setClickable(true); setFocusable(true);
-    setOnClickListener(v -> showExpanded());
+    setClickable(false); setFocusable(true);
     setOnLongClickListener(v -> { if (this.settingsAction != null) this.settingsAction.run(); return true; });
     setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_YES);
     refresh();
@@ -97,9 +95,7 @@ final class DuoStatusView extends View {
     if (networkRegistered) { try { connectivity.unregisterNetworkCallback(network); } catch (RuntimeException ignored) {} networkRegistered = false; }
     if (signalRegistered) { try { telephony.listen(signal, PhoneStateListener.LISTEN_NONE); } catch (RuntimeException ignored) {} signalRegistered = false; }
     MobileDisplay.stop(telephony, mobileCallback); mobileCallback = null;
-    if (popup != null && !popup.isAwaitingPermission()) popup.closeImmediately();
   }
-  void hostStopped() { if (popup != null) popup.closeImmediately(); }
   private void refresh() {
     airplane = Settings.Global.getInt(activity.getContentResolver(), Settings.Global.AIRPLANE_MODE_ON, 0) != 0;
     PowerManager power = activity.getSystemService(PowerManager.class);
@@ -128,9 +124,8 @@ final class DuoStatusView extends View {
     mobileLabel = NetworkLabel.mobile(networkType, networkOverride);
     setContentDescription("Status. Battery " + (battery < 0 ? "unavailable" : battery + " percent") + (charging ? ", charging" : "")
         + ". " + (mobileConnected ? "Mobile data " + mobileLabel : "Wi-Fi " + (wifiConnected ? "connected, signal " + wifiLevel + " of 4" : "not connected"))
-        + ". " + (airplane ? "Airplane mode" : "Cellular signal " + (cellLevel < 0 ? "unavailable" : cellLevel + " of 4")) + ". Tap to expand.");
+        + ". " + (airplane ? "Airplane mode" : "Cellular signal " + (cellLevel < 0 ? "unavailable" : cellLevel + " of 4")) + ".");
     invalidate();
-    if (popup != null && popup.isShowing()) popup.updateStatus(battery, charging, wifiConnected, mobileConnected, mobileLabel, airplane);
   }
   @Override protected void onDraw(Canvas canvas) {
     super.onDraw(canvas);
@@ -165,18 +160,5 @@ final class DuoStatusView extends View {
     for(int i=0;i<4;i++){paint.setColor(cellLevel>i&&!airplane ? Color.WHITE : 0x55FFFFFF);canvas.drawCircle(cx-7.5f+i*5,cy+radius-1,1.4f,paint);}
     if(charging){paint.setTextSize(8);paint.setColor(0xFF95E8AB);canvas.drawText("ϟ",cx+radius+3,cy+3,paint);}
     canvas.restore();
-  }
-  private void showExpanded() {
-    if (popup != null && popup.isShowing()) { popup.dismiss(); return; }
-    popup = new DuoControlCenter(activity, this);
-    popup.updateStatus(battery, charging, wifiConnected, mobileConnected, mobileLabel, airplane);
-    popup.show();
-  }
-  void permissionResult(int request, int[] grants) {
-    if (popup != null && popup.isShowing()) popup.permissionResult(request, grants);
-    else if (request == DuoControlCenter.TORCH_PERMISSION) {
-      Toast.makeText(activity, grants.length > 0 && grants[0] == android.content.pm.PackageManager.PERMISSION_GRANTED
-          ? "Flashlight access enabled. Tap the flashlight to turn it on." : "Flashlight needs Camera access. Other controls still work.", Toast.LENGTH_LONG).show();
-    }
   }
 }

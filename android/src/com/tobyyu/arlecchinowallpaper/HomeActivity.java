@@ -433,7 +433,6 @@ public final class HomeActivity extends Activity {
   }
 
   @Override protected void onStop() {
-    if (duoStatus != null) duoStatus.hostStopped();
     super.onStop();
   }
 
@@ -1385,11 +1384,6 @@ public final class HomeActivity extends Activity {
         else controller.show(WindowInsets.Type.statusBars());
       }
     }
-  }
-
-  @Override public void onRequestPermissionsResult(int request, String[] permissions, int[] grants) {
-    super.onRequestPermissionsResult(request, permissions, grants);
-    if (duoStatus != null) duoStatus.permissionResult(request, grants);
   }
 
   @Override public void onWindowFocusChanged(boolean focus) {

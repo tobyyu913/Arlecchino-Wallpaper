@@ -26,9 +26,7 @@ public final class DuoStatusTests extends Instrumentation {
     await(()->status().getVisibility()==View.VISIBLE&&hidden(),"Native status bar was not hidden on launcher");
     await(()->status().getContentDescription().toString().contains("Battery 55 percent"),"Live battery status missing");
     main(()->{check(activity.checkSelfPermission(android.Manifest.permission.ACCESS_WIFI_STATE)==android.content.pm.PackageManager.PERMISSION_GRANTED,"Wi-Fi permission not normal/granted");status().performClick();});
-    await(()->statusField("popup")!=null&&((DuoControlCenter)statusField("popup")).isShowing(),"Status panel failed to expand");
-    await(this::hidden,"Expanded panel revealed the native status bar");
-    main(()->{check(text(((DuoControlCenter)statusField("popup")).getWindow().getDecorView(),"55%"),"Expanded battery value missing");check(hidden(),"Expanded panel revealed the native status bar");((DuoControlCenter)statusField("popup")).closeImmediately();});
+    main(()->check(!status().isClickable(),"Status must not open a control panel"));
     main(()->{getTargetContext().getSharedPreferences("home",0).edit().putBoolean("duoStatus",false).apply();status().stop();});apply();
     await(()->status().getVisibility()==View.GONE&&!hidden(),"Disabling Duo did not restore normal status bar");
     main(()->{getTargetContext().getSharedPreferences("home",0).edit().putBoolean("duoStatus",true).apply();status().start();});apply();
@@ -39,7 +37,7 @@ public final class DuoStatusTests extends Instrumentation {
     check(getUiAutomation().performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME),"System Home failed");
     Activity returned=homes.waitForActivityWithTimeout(2000);if(returned!=null)activity=returned;removeMonitor(homes);
     await(()->activity.hasWindowFocus()&&hidden()&&(Boolean)statusField("started"),"Status did not resume/hide native bar after returning Home");
-    result.putString("stream","PASS: launcher-only fullscreen, live battery, expanded status, normal-bar toggle, background cleanup and Home return; no root/overlay or dangerous phone permission\n");finish(Activity.RESULT_OK,result);
+    result.putString("stream","PASS: launcher-only fullscreen, live battery, read-only status, normal-bar toggle, background cleanup and Home return; no root/overlay or dangerous phone permission\n");finish(Activity.RESULT_OK,result);
   }catch(Throwable failure){
     try {
       android.graphics.Bitmap screenshot=getUiAutomation().takeScreenshot();

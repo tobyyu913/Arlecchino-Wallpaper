@@ -186,3 +186,8 @@ The native OEM state now takes precedence over PowerManager for the control and 
 The phone had a selected live wallpaper but no connected rendering engine. Its crash history also contained an AnimatedImageDrawable completion callback failure. Android's [drawable implementation](https://android.googlesource.com/platform/frameworks/base/+/master/graphics/java/android/graphics/drawable/AnimatedImageDrawable.java) posts completion work that can iterate its callback list after clearAnimationCallbacks has nulled it. Playback retirement now detaches drawing, cancels its action and retains an inert weak completion callback instead of clearing the list. Wallpaper rendering runs in a private process, separate from the launcher.
 
 Native emulator instrumentation passed 24 queued-end cancellation/release races and natural one-shot completion; pure wake-state tests passed. Signed version 1.18 was installed on the physical Xiaomi phone: WallpaperManager reported a connected engine/service and the private wallpaper process was running with its service binding received. Earlier HyperOS framework startup resource exceptions are recorded separately; this change does not claim to patch that framework. No control-panel behavior was changed.
+
+
+### Control panel removed, 1.19
+
+Removed the expanded control panel, Shizuku helper/provider/dependencies and panel-only permissions. The compact status column remains read-only with launcher-settings long-press. Native emulator status tests verify live battery data, no clickable expansion, system-bar handling and lifecycle cleanup.

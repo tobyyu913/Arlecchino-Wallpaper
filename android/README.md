@@ -4,14 +4,14 @@ An independently implemented, minimalist Android launcher with the Arlecchino cu
 
 ## Install and setup
 
-Current source builds **Android 1.18** with `./scripts/build-android.sh`, producing `outputs/Arlecchino-Home-Android-1.18.apk`. Published APKs are available in [GitHub releases](https://github.com/tobyyu913/Arlecchino-Wallpaper/releases) and may be older than this branch. Requires Android 9 or later.
+Current source builds **Android 1.19** with `./scripts/build-android.sh`, producing `outputs/Arlecchino-Home-Android-1.19.apk`. Published APKs are available in [GitHub releases](https://github.com/tobyyu913/Arlecchino-Wallpaper/releases) and may be older than this branch. Requires Android 9 or later.
 
 1. Install the APK and open **Arlecchino Home**.
 2. Tap **Choose favorites** and select your home-screen apps.
 3. Tap **Make this your home screen** and confirm Arlecchino Home in Android's home-app picker.
 4. Tap **Enable curtain wallpaper** if the wallpaper is not already active, then confirm it in the system wallpaper picker.
 
-Version 1.18 updates the existing Arlecchino Wallpaper package using the same signing key. The old wallpaper-only APKs remain available in earlier releases. Installing this version does not automatically change the default launcher or grant notification access.
+Version 1.19 updates the existing Arlecchino Wallpaper package using the same signing key. The old wallpaper-only APKs remain available in earlier releases. Installing this version does not automatically change the default launcher or grant notification access.
 
 ## Home-screen workflow
 
@@ -29,34 +29,15 @@ Version 1.18 updates the existing Arlecchino Wallpaper package using the same si
 
 This is an independent implementation of the free-version workflow, with additional Arlecchino styling. See [reference checks](REFERENCE-CHECKS.md) for observed surfaces, matching behavior and test limits. It does not claim exhaustive or pixel-for-pixel Niagara parity. Pro-only widget/calendar/weather integrations and work-profile support are not implemented.
 
-## Duo-style status column and Control Center, 1.16
+## Duo-style status column
 
-Enabled by default on the launcher: a small clock above a circular battery ring, Wi-Fi arcs and cellular dots. Tap it for the glass Control Center; long-press it for launcher settings. On mobile data the center displays 5G, 4G, 3G or 2G from the reported radio/display information. Unknown generations show DATA, and disconnected radios show a dash instead of empty Wi-Fi arcs. Use **Arlecchino settings → Duo status bar** to restore the normal Android status bar.
+Enabled by default on the launcher: a small clock above a circular battery ring, Wi-Fi arcs and cellular dots. Long-press it for launcher settings. On mobile data the center displays 5G, 4G, 3G or 2G from the reported radio/display information. Unknown generations show DATA, and disconnected radios show a dash instead of empty Wi-Fi arcs. Use **Arlecchino settings → Duo status bar** to restore the normal Android status bar.
 
 This is an independent Android rendering based on Apple's published iPhone Duo layout. It lives inside the launcher window, with no root, accessibility service or draw-over-other-apps permission. The normal status bar is hidden while this launcher is visible; other apps keep their own normal system bars. Android can temporarily reveal its bar for a top-edge swipe or system alert. This does not replace the lock-screen status bar or system Quick Settings.
 
-Battery, charging, battery-saver, Wi-Fi and cellular readings update while Home is visible. Network/Wi-Fi and Android 13+ basic cellular-state access use normal install-time permissions. No dangerous phone-state or location permission is requested, and no network requests are sent. Android's display-info callback handles 5G NSA branding over LTE where available. The active data SIM is selected when Home resumes. Unknown/unsupported readings stay unavailable rather than inventing a generation. Listeners and the panel stop when Home goes into the background.
+Battery, charging, battery-saver, Wi-Fi and cellular readings update while Home is visible. Network/Wi-Fi and Android 13+ basic cellular-state access use normal install-time permissions. No dangerous phone-state or location permission is requested, and no network requests are sent. Android's display-info callback handles 5G NSA branding over LTE where available. The active data SIM is selected when Home resumes. Unknown/unsupported readings stay unavailable rather than inventing a generation. Listeners stop when Home goes into the background.
 
-The expanded layout uses connectivity/media tiles, circular utility controls and vertical brightness/volume sliders. It grows from the compact status indicator and collapses back with eased motion, respects disabled system animations, and dismisses with Back, the close control, an outside tap or an upward swipe near its bottom. Android 12+ supplies supported backdrop blur; launcher content also softens behind the panel. The grid scrolls when the display is too short.
-
-| Control | Android behavior |
-| --- | --- |
-| Media volume | Changes real media-stream volume; supports touch and accessibility adjustment. |
-| Brightness / rotation lock | Changes system settings after the user grants **Modify system settings** on first use. Brightness adjustment switches to manual brightness. |
-| Flashlight | Toggles the rear flash through CameraManager; asks for Camera permission only when tapped. No camera preview or recording is created. Unsupported/in-use flash reports that state. |
-| Play/pause, previous/next | Sends supported transport actions to the active media session using existing optional notification access; unavailable actions are dimmed. |
-| Silent | Toggles normal/vibrate where Android permits it; otherwise opens Sound settings. |
-| Wi-Fi / mobile data / Bluetooth / airplane mode | Opens Android's actual connectivity panel or settings because ordinary modern Android apps cannot directly toggle these radios. |
-| Low Power | Uses optional Shizuku for stock Android Battery Saver. On HyperOS/MIUI it reads the native Xiaomi state and attempts the native provider. If Xiaomi signature permissions block that provider, it reports the restriction and offers an explicit handoff to Xiaomi’s own control; it does not report the stock Android flag as native success. |
-| Automatic brightness | Switches adaptive/manual brightness directly after Modify system settings access. |
-| Focus | Switches Arlecchino's Do Not Disturb mode after optional policy access. Android 15+ owns this as an app-specific mode; other active system modes remain independent. |
-| Timer / calculator / camera | Opens the corresponding installed app or system action; missing handlers fall back to Settings. |
-
-Version 1.17 reduces the grid width, softens its borders, removes nested radio outlines and settings-only filler tiles, and keeps the original monochrome symbols. Opening reveals the panel from the status corner at nearly full text scale; it no longer shrinks the whole menu into a tiny thumbnail. The Low Power pill has a live amber enabled state. UI-mode changes caused by Battery Saver are handled without recreating the launcher.
-
-For the Low Power switch, install/start [Shizuku](https://shizuku.rikka.app/), then allow Arlecchino Home when Shizuku asks. No root is needed: the optional user service runs with the shell identity and exposes only a fixed Battery Saver operation, not arbitrary command strings. Access can be revoked in Shizuku. Start Shizuku again after a reboot. The switch keeps the menu open through permission/operation handoff and shows pending state until the relevant native state confirms the result. HyperOS can block its native switch even from shell/Shizuku; this cannot be fixed by granting ordinary Shizuku access. Version 1.17.1 corrects the previous false success when Android’s separate low_power flag was on but Xiaomi’s POWER_SAVE_MODE_OPEN remained off. While charging, unplug first if Android disallows Battery Saver.
-
-The close button dismisses the panel; no nonfunctional power-off control is presented. Special permissions remain optional and are never enabled automatically on a physical phone.
+The status column is read-only. The expanded control panel and Shizuku integration were removed in version 1.19. Long-press the status column to open launcher settings.
 
 ## Android navigation gestures
 
@@ -92,7 +73,7 @@ Install JDK 17, Android SDK platform 35, and build-tools 34.0.0, then run:
 ./scripts/build-android.sh
 ```
 
-The script uses Android SDK tools directly without Gradle. Shizuku API/provider/aidl/shared 13.1.5 dependencies are fetched from Maven Central into the ignored build cache with pinned SHA-256 checksums from `android/dependencies.json`. Their MIT license is included in the source and APK. The launcher makes no runtime internet requests. Set `ANDROID_HOME` for another SDK path, `JAVA_HOME` for JDK 17, or `ANDROID_BUILD_TOOLS` / `ANDROID_PLATFORM_JAR` to override SDK versions.
+The script uses Android SDK tools directly without Gradle. The launcher makes no runtime internet requests. Set `ANDROID_HOME` for another SDK path, `JAVA_HOME` for JDK 17, or `ANDROID_BUILD_TOOLS` / `ANDROID_PLATFORM_JAR` to override SDK versions.
 
 A private signing key is generated in ignored `work/android-signing/` on the first build. Back that directory up privately; do not publish it. Compatible updates must use the same signing key. A build with a different key cannot update an existing installation without uninstalling it.
 
@@ -105,25 +86,4 @@ java -cp work/android-tests com.tobyyu.arlecchinowallpaper.WakeCycleTest
 java -cp work/android-tests com.tobyyu.arlecchinowallpaper.AppIndexTest
 ```
 
-Run `./scripts/test-android-music.sh EMULATOR_SERIAL [ADB_PORT]` on a disposable emulator for real MediaSession callback/transport tests. It refuses physical devices because it grants notification access for synthetic test sessions. Pass `TransitionTests` as a third argument to check intermediate departure frames, synchronized fades, quick-release settling and canceling back to favorites. The music tests cover title/artist updates, play/pause, previous/next, resume, active-player changes and destroyed sessions. `NavigationTests` checks edge reservations, native Back, search dismissal, cancellation, Home and Recents. `DuoStatusTests` checks live battery data, expansion, native-bar hiding/restoration, background cleanup and returning Home. `BatterySaverTests`, with official Shizuku running on the disposable emulator and an unplugged battery fixture, checks real Battery Saver on/off, permission handoff and retaining the panel. `ControlCenterTests` exercises actual volume/brightness/rotation changes, media transport commands, native Back dismissal, system-panel handoff and cleanup. These suites are emulator-only; the status suite temporarily sets and then resets an emulator battery fixture.
-
-Wake tests cover missed/duplicate/rapid wake events, decode cancellation, replaced surfaces, timeouts, and returning home. App-index tests cover sorting and search.
-
-Physical Xiaomi testing verifies Home, search, favorite persistence, app launching, renaming/resetting labels, swipe-right app pop-ups, alphabet navigation, and pop-up folder management. Frame-timing tests compare repeated rail drags on the same device. See the reference checks for permission-gated test limits. The test left the user's original default launcher and notification-access settings unchanged. Prior wallpaper testing verified three normal wake cycles and recovery after five rapid screen-off/on cycles. APK signatures and alignment are checked by the build script.
-
-## Import favorites
-
-Open Arlecchino settings → Import favorites and select a JSON file containing an ordered array of installed package names or launcher components. For example: `["com.android.settings", "com.android.chrome"]`. A review dialog lists the apps in order before replacing favorites; unavailable entries are reported and duplicates are removed. Cancel or malformed files leave the current list unchanged. Imported favorites are also removed from the hidden-app list. No storage permission is needed: Android's file picker grants access only to the selected file. This is an Arlecchino JSON format, not a parser for Niagara's proprietary backup format.
-
-## Minimal icons for uncovered apps
-
-Version 1.9 includes 58 app-specific AI-generated outline assets covering 59 packages (the CloudDrive app and its web shortcut share an identity). They supplement an installed icon pack only when that pack has no matching icon. The built-in outline mode also uses them where available. System-icon mode retains original app icons.
-
-The assets were generated with OpenAI's image-generation tool from original app-icon identity references, reviewed as monochrome masks and at small sizes, and bundled locally. Their alpha contours are rendered in the launcher's warm white ink with consistent bounds and aspect ratio. There is no AI request, API key, internet permission or generation delay on the phone. New, unrecognized packages still require an additional icon or icon-pack update.
-
-
-## Performance, 1.13
-
-Icon-pack parsing, image decoding and icon rasterization run on background workers. Recycled rows use tagged asynchronous requests so delayed results cannot replace another app's icon. The launcher keeps a bounded 192-icon cache and four recently visited gesture-section layouts, and caches alphabet grouping rather than repeating transliteration during sorting. Favorites departures reuse a half-resolution snapshot rather than allocating a full-display bitmap each time. Media health checks keep their existing session recovery but reuse unchanged artwork.
-
-Transition instrumentation also checks that neighboring-section visits reuse views and repeated departures reuse their snapshot. The tests run on an emulator; no phone testing or installation is required.
+Run `./scripts/test-android-music.sh EMULATOR_SERIAL [ADB_PORT]` on a disposable emulator for real MediaSession callback/transport tests. It refuses physical devices because it grants notification access for synthetic test sessions. Pass `TransitionTests` as a third argument to check intermediate departure frames, synchronized fades, quick-release settling and canceling back to favorites. The music tests cover title/artist updates, play/pause, previous/next, resume, active-player changes and destroyed sessions. `NavigationTests` checks edge reservations, native Back, search dismissal, cancellation, Home and Recents. `DuoStatusTests` checks live battery data, read-only status, native-bar hiding/restoration, background cleanup and returning Home. These suites are emulator-only; the status suite temporarily sets and then resets an emulator battery fixture.
