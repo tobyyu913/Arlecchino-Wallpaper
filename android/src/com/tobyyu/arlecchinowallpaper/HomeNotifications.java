@@ -14,15 +14,16 @@ public final class HomeNotifications extends NotificationListenerService {
   static final String CHANGED = "com.tobyyu.arlecchinowallpaper.NOTIFICATIONS_CHANGED";
 
   static final class Preview {
-    final String key, text;
+    final String key, text, fullText;
     final PendingIntent action;
     final long time;
     final Notification.Action replyAction;
 
     Preview(
-        String key, String text, PendingIntent action, long time, Notification.Action replyAction) {
+        String key, String text, String fullText, PendingIntent action, long time, Notification.Action replyAction) {
       this.key = key;
       this.text = text;
+      this.fullText = fullText;
       this.action = action;
       this.time = time;
       this.replyAction = replyAction;
@@ -79,15 +80,44 @@ public final class HomeNotifications extends NotificationListenerService {
     notifyHome();
   }
 
+  static String expandedText(Notification n) {
+    StringBuilder result = new StringBuilder();
+    CharSequence title = n.extras.getCharSequence(Notification.EXTRA_TITLE);
+    if (title != null && title.length() > 0) result.append(title).append("\n\n");
+    android.os.Parcelable[] bundles = n.extras.getParcelableArray(Notification.EXTRA_MESSAGES);
+    java.util.List<Notification.MessagingStyle.Message> messages = bundles == null
+        ? java.util.Collections.emptyList()
+        : Notification.MessagingStyle.Message.getMessagesFromBundleArray(bundles);
+    if (!messages.isEmpty()) {
+      for (Notification.MessagingStyle.Message message : messages) {
+        if (message.getText() == null) continue;
+        if (message.getSenderPerson() != null && message.getSenderPerson().getName() != null)
+          result.append(message.getSenderPerson().getName()).append(": ");
+        result.append(message.getText()).append('\n');
+      }
+    } else {
+      CharSequence body = n.extras.getCharSequence(Notification.EXTRA_BIG_TEXT);
+      CharSequence[] lines = n.extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES);
+      if (body != null && body.length() > 0) result.append(body);
+      else if (lines != null && lines.length > 0) {
+        for (CharSequence line : lines) if (line != null) result.append(line).append('\n');
+      } else {
+        body = n.extras.getCharSequence(Notification.EXTRA_TEXT);
+        if (body != null) result.append(body);
+      }
+    }
+    return result.toString().trim();
+  }
+
   private static synchronized void store(StatusBarNotification item) {
     Notification n = item.getNotification();
-    if ((n.flags & Notification.FLAG_GROUP_SUMMARY) != 0 || n.contentIntent == null) return;
+    if ((n.flags & Notification.FLAG_GROUP_SUMMARY) != 0) return;
     CharSequence title = n.extras.getCharSequence(Notification.EXTRA_TITLE);
     CharSequence body = n.extras.getCharSequence(Notification.EXTRA_TEXT);
     if (title == null && body == null) return;
     String text = title == null ? "" : title.toString();
     if (body != null && body.length() > 0) text += (text.isEmpty() ? "" : " · ") + body.toString();
-    if (text.length() > 240) text = text.substring(0, 240);
+    String fullText = expandedText(n);
     Map<String, Preview> entries = notifications.get(item.getPackageName());
     if (entries == null) {
       entries = new HashMap<>();
@@ -102,7 +132,7 @@ public final class HomeNotifications extends NotificationListenerService {
         }
     entries.put(
         item.getKey(),
-        new Preview(item.getKey(), text, n.contentIntent, item.getPostTime(), reply));
+        new Preview(item.getKey(), text, fullText, n.contentIntent, item.getPostTime(), reply));
   }
 
   @Override

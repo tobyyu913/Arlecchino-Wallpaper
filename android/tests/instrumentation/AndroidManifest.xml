@@ -6,4 +6,5 @@
 <instrumentation android:name="com.tobyyu.arlecchinowallpaper.NavigationTests" android:targetPackage="com.tobyyu.arlecchinowallpaper"/>
 <instrumentation android:name="com.tobyyu.arlecchinowallpaper.DuoStatusTests" android:targetPackage="com.tobyyu.arlecchinowallpaper"/>
 <instrumentation android:name="com.tobyyu.arlecchinowallpaper.WallpaperPlaybackTests" android:targetPackage="com.tobyyu.arlecchinowallpaper"/>
+<instrumentation android:name="com.tobyyu.arlecchinowallpaper.NotificationTests" android:targetPackage="com.tobyyu.arlecchinowallpaper"/>
 </manifest>

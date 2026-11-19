@@ -4,14 +4,14 @@ An independently implemented, minimalist Android launcher with the Arlecchino cu
 
 ## Install and setup
 
-Current source builds **Android 1.19** with `./scripts/build-android.sh`, producing `outputs/Arlecchino-Home-Android-1.19.apk`. Published APKs are available in [GitHub releases](https://github.com/tobyyu913/Arlecchino-Wallpaper/releases) and may be older than this branch. Requires Android 9 or later.
+Current source builds **Android 1.20** with `./scripts/build-android.sh`, producing `outputs/Arlecchino-Home-Android-1.20.apk`. Published APKs are available in [GitHub releases](https://github.com/tobyyu913/Arlecchino-Wallpaper/releases) and may be older than this branch. Requires Android 9 or later.
 
 1. Install the APK and open **Arlecchino Home**.
 2. Tap **Choose favorites** and select your home-screen apps.
 3. Tap **Make this your home screen** and confirm Arlecchino Home in Android's home-app picker.
 4. Tap **Enable curtain wallpaper** if the wallpaper is not already active, then confirm it in the system wallpaper picker.
 
-Version 1.19 updates the existing Arlecchino Wallpaper package using the same signing key. The old wallpaper-only APKs remain available in earlier releases. Installing this version does not automatically change the default launcher or grant notification access.
+Version 1.20 updates the existing Arlecchino Wallpaper package using the same signing key. The old wallpaper-only APKs remain available in earlier releases. Installing this version does not automatically change the default launcher or grant notification access.
 
 ## Home-screen workflow
 
@@ -44,6 +44,10 @@ The status column is read-only. The expanded control panel and Shizuku integrati
 The launcher reserves Android's reported side and bottom gesture regions for Back, Home and Recents, and moves its alphabet touch bands inward. System-canceled drags settle to a stable list; returning Home refreshes the insets. Android 13+ uses the platform Back callback, with legacy Back retained on older releases. Only the status bar is hidden; the system navigation bar/gesture handle remains under Android's control.
 
 Enable gesture navigation in your device settings if the OS supports it for third-party launchers. Some Xiaomi firmware restricts third-party Home/Recents gestures; an ordinary launcher cannot bypass that restriction without privileged integration. See [Niagara's explanation of system gesture restrictions](https://help.niagaralauncher.app/article/7-gesture-navigation).
+
+## Notification previews
+
+Tap notification text under an app to read it in the launcher. The reader shows expanded text, conversation messages or inbox lines supplied by the app, with selectable text and scrolling. Reading or closing it never opens another app. Use the labelled **Open [app]** button to follow the notification, or **Reply** when supported. Expired notification links report that they are unavailable rather than launching an unrelated app screen.
 
 ## Music on favorites
 

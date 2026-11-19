@@ -191,3 +191,10 @@ Native emulator instrumentation passed 24 queued-end cancellation/release races 
 ### Control panel removed, 1.19
 
 Removed the expanded control panel, Shizuku helper/provider/dependencies and panel-only permissions. The compact status column remains read-only with launcher-settings long-press. Native emulator status tests verify live battery data, no clickable expansion, system-bar handling and lifecycle cleanup.
+
+
+### Notification reader, 1.20
+
+Notification previews now open a launcher-local reader instead of immediately sending the content PendingIntent. Only the explicit labelled Open button follows that link; canceled links report unavailability without falling back to an arbitrary app launch. Expanded BigText, InboxStyle lines and MessagingStyle messages supplied by Android are retained without the previous launcher-imposed 240-character cut. Android or the originating app can still limit supplied content. Notifications without content intents remain readable.
+
+Native emulator tests verify the expanded formats, zero intent sends while reading/closing, and exactly one send after explicit Open. Tests use synthetic notifications, not private phone notifications.

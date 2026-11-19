@@ -864,7 +864,7 @@ public final class HomeActivity extends Activity {
     HomeNotifications.Preview notification = HomeNotifications.latest(a.pkg);
     if (notification != null) {
       labels.add(notification.text);
-      actions.add(() -> openNotification(a, notification));
+      actions.add(() -> showNotification(label(a), notification));
       if (notification.replyAction != null) {
         labels.add("Reply");
         actions.add(() -> reply(notification));
@@ -913,12 +913,24 @@ public final class HomeActivity extends Activity {
     sheet(label(a), labels, n -> actions.get(n).run());
   }
 
-  private void openNotification(App a, HomeNotifications.Preview n) {
-    try {
-      n.action.send();
-    } catch (PendingIntent.CanceledException e) {
-      launch(a);
-    }
+  AlertDialog showNotification(String appName, HomeNotifications.Preview n) {
+    ScrollView scroll = new ScrollView(this);
+    TextView body = text(n.fullText, 16, INK);
+    body.setPadding(dp(24), dp(12), dp(24), dp(20));
+    body.setTextIsSelectable(true);
+    scroll.addView(body);
+    AlertDialog.Builder panel = new AlertDialog.Builder(this)
+        .setTitle(appName + " · Notification")
+        .setView(scroll)
+        .setNegativeButton("Close", null);
+    if (n.action != null) panel.setPositiveButton("Open " + appName, (d, w) -> {
+      try { n.action.send(); }
+      catch (PendingIntent.CanceledException e) {
+        Toast.makeText(this, "This notification is no longer available", Toast.LENGTH_SHORT).show();
+      }
+    });
+    if (n.replyAction != null) panel.setNeutralButton("Reply", (d, w) -> reply(n));
+    return panel.show();
   }
 
   private void reply(HomeNotifications.Preview n) {
@@ -1582,7 +1594,7 @@ public final class HomeActivity extends Activity {
               : recent
                   ? (prefs.getLong("last:" + a.id, 0) > 0 ? "Recently used" : "Recently installed")
                   : "");
-      preview.setOnClickListener(n == null ? null : v -> openNotification(a, n));
+      preview.setOnClickListener(n == null ? null : v -> showNotification(label(a), n));
 
       return line;
     }
