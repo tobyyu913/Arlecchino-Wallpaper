@@ -12,7 +12,6 @@ import android.graphics.Paint;
 import android.graphics.Point;
 import android.graphics.RectF;
 import android.graphics.ImageDecoder;
-import android.graphics.drawable.Animatable2;
 import android.graphics.drawable.AnimatedImageDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
@@ -42,6 +41,7 @@ public final class CurtainWallpaperService extends WallpaperService {
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
         private Bitmap restingFrame;
         private AnimatedImageDrawable animation;
+        private WallpaperPlayback playback;
         private boolean surfaceReady;
         private volatile boolean destroyed;
         private volatile int generation;
@@ -185,17 +185,13 @@ public final class CurtainWallpaperService extends WallpaperService {
                     if (loaded == null) { cycle.finish(); requestDraw(); return; }
                     if (!cycle.decoded(SystemClock.elapsedRealtime())) { loaded.stop(); requestDraw(); return; }
                     animation = loaded;
-                    animation.setRepeatCount(0);
-                    animation.setCallback(CurtainEngine.this);
-                    animation.registerAnimationCallback(new Animatable2.AnimationCallback() {
-                        @Override public void onAnimationEnd(Drawable drawable) {
-                            if (animation != drawable) return;
-                            cycle.finish();
-                            stopAnimation();
-                            requestDraw();
-                        }
+                    playback = new WallpaperPlayback(loaded, CurtainEngine.this, () -> {
+                        if (animation != loaded) return;
+                        cycle.finish();
+                        stopAnimation();
+                        requestDraw();
                     });
-                    animation.start();
+                    playback.start();
                     requestDraw();
                 });
             });
@@ -207,9 +203,10 @@ public final class CurtainWallpaperService extends WallpaperService {
             if (animation != null) {
                 AnimatedImageDrawable previous = animation;
                 animation = null;
-                previous.clearAnimationCallbacks();
-                previous.stop();
-                previous.setCallback(null);
+                WallpaperPlayback previousPlayback = playback;
+                playback = null;
+                if (previousPlayback != null) previousPlayback.release();
+                else { previous.setCallback(null); previous.stop(); }
                 handler.removeCallbacksAndMessages(previous);
             }
         }

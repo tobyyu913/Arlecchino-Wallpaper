@@ -9,4 +9,5 @@
 <instrumentation android:name="com.tobyyu.arlecchinowallpaper.ControlCenterTests" android:targetPackage="com.tobyyu.arlecchinowallpaper"/>
 <instrumentation android:name="com.tobyyu.arlecchinowallpaper.BatterySaverTests" android:targetPackage="com.tobyyu.arlecchinowallpaper"/>
 <instrumentation android:name="com.tobyyu.arlecchinowallpaper.OemBatterySaverTests" android:targetPackage="com.tobyyu.arlecchinowallpaper"/>
+<instrumentation android:name="com.tobyyu.arlecchinowallpaper.WallpaperPlaybackTests" android:targetPackage="com.tobyyu.arlecchinowallpaper"/>
 </manifest>

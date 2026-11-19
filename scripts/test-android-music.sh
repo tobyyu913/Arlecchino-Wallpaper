@@ -5,7 +5,7 @@ SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}"
 SERIAL="${1:?Usage: test-android-music.sh EMULATOR_SERIAL [ADB_PORT]}"
 PORT="${2:-5037}"
 SUITE="${3:-MusicTests}"
-case "$SUITE" in MusicTests|TransitionTests|NavigationTests|DuoStatusTests|ControlCenterTests|BatterySaverTests|OemBatterySaverTests) ;; *) echo 'Unknown test suite' >&2; exit 1 ;; esac
+case "$SUITE" in MusicTests|TransitionTests|NavigationTests|DuoStatusTests|ControlCenterTests|BatterySaverTests|OemBatterySaverTests|WallpaperPlaybackTests) ;; *) echo 'Unknown test suite' >&2; exit 1 ;; esac
 ADB=("$SDK/platform-tools/adb" -P "$PORT" -s "$SERIAL")
 if [[ "$("${ADB[@]}" shell getprop ro.kernel.qemu | tr -d '\r')" != 1 ]]; then
     echo 'Music instrumentation is restricted to an emulator; it grants notification access to test synthetic sessions.' >&2
@@ -33,7 +33,7 @@ run(['zip','-q','-j',b/'base.apk',b/'dex/classes.dex'])
 run([tools/'zipalign','-f','4',b/'base.apk',b/'aligned.apk'])
 run([tools/'apksigner','sign','--ks',root/'work/android-signing/release.jks','--ks-key-alias','arlecchino','--ks-pass','file:'+str(root/'work/android-signing/password.txt'),'--out',b/'test.apk',b/'aligned.apk'])
 PY
-"${ADB[@]}" install --no-incremental -r outputs/Arlecchino-Home-Android-1.17.1.apk
+"${ADB[@]}" install --no-incremental -r outputs/Arlecchino-Home-Android-1.18.apk
 "${ADB[@]}" install --no-incremental -r "$BUILD/test.apk"
 if [[ "$SUITE" == NavigationTests ]]; then
     "${ADB[@]}" shell cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.gestural
