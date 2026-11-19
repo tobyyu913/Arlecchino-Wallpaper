@@ -10,18 +10,21 @@ JDK="${JAVA_HOME:-$(/usr/libexec/java_home -v 17)}"
 export JAVA_HOME="$JDK"
 export PATH="$JDK/bin:$PATH"
 mkdir -p "$BUILD/generated" "$BUILD/classes" "$BUILD/dex" "$KEYDIR" "$ROOT/outputs"
+python3 "$ROOT/scripts/android-dependencies.py"
 find "$BUILD/classes" -name '*.class' -type f -delete
 "$TOOLS/aapt2" compile --dir "$ROOT/android/res" -o "$BUILD/resources.zip"
 "$TOOLS/aapt2" link -o "$BUILD/base.apk" -I "$PLATFORM" \
     --manifest "$ROOT/android/AndroidManifest.xml" -R "$BUILD/resources.zip" \
     --java "$BUILD/generated" --auto-add-overlay
 python3 - "$ROOT" "$JDK" "$PLATFORM" "$TOOLS" <<'PY'
-import pathlib, subprocess, sys
+import pathlib, subprocess, sys, json
 root,jdk,platform,tools=sys.argv[1:]
 build=pathlib.Path(root)/'work/android-build'
+jars=[pathlib.Path(root)/'work/android-dependencies'/item['name'] for item in json.loads((pathlib.Path(root)/'android/dependencies.json').read_text())]
+classpath=platform+':' + ':'.join(map(str,jars))
 source=list((pathlib.Path(root)/'android/src').rglob('*.java'))+list((build/'generated').rglob('*.java'))
-subprocess.run([jdk+'/bin/javac','--release','8','-classpath',platform,'-d',str(build/'classes')]+[str(p) for p in source],check=True)
-subprocess.run([tools+'/d8','--lib',platform,'--min-api','28','--output',str(build/'dex')]+[str(p) for p in (build/'classes').rglob('*.class')],check=True)
+subprocess.run([jdk+'/bin/javac','--release','8','-classpath',classpath,'-d',str(build/'classes')]+[str(p) for p in source],check=True)
+subprocess.run([tools+'/d8','--lib',platform,'--min-api','28','--output',str(build/'dex')]+[str(p) for p in (build/'classes').rglob('*.class')]+list(map(str,jars)),check=True)
 PY
 cp "$BUILD/base.apk" "$BUILD/with-dex.apk"
 zip -q -j "$BUILD/with-dex.apk" "$BUILD/dex/classes.dex"
@@ -34,7 +37,7 @@ if [ ! -f "$KEYDIR/release.jks" ]; then
         -alias arlecchino -keyalg RSA -keysize 3072 -validity 10000 \
         -dname 'CN=Arlecchino Wallpaper' -storetype JKS
 fi
-APK="$ROOT/outputs/Arlecchino-Home-Android-1.16.1.apk"
+APK="$ROOT/outputs/Arlecchino-Home-Android-1.17.apk"
 "$TOOLS/apksigner" sign --ks "$KEYDIR/release.jks" --ks-key-alias arlecchino \
     --ks-pass "file:$KEYDIR/password.txt" \
     --out "$APK" "$BUILD/aligned.apk"

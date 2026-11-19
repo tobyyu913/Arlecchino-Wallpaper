@@ -96,8 +96,9 @@ final class DuoStatusView extends View {
     if (networkRegistered) { try { connectivity.unregisterNetworkCallback(network); } catch (RuntimeException ignored) {} networkRegistered = false; }
     if (signalRegistered) { try { telephony.listen(signal, PhoneStateListener.LISTEN_NONE); } catch (RuntimeException ignored) {} signalRegistered = false; }
     MobileDisplay.stop(telephony, mobileCallback); mobileCallback = null;
-    if (popup != null) popup.closeImmediately();
+    if (popup != null && !popup.isAwaitingPermission()) popup.closeImmediately();
   }
+  void hostStopped() { if (popup != null) popup.closeImmediately(); }
   private void refresh() {
     airplane = Settings.Global.getInt(activity.getContentResolver(), Settings.Global.AIRPLANE_MODE_ON, 0) != 0;
     PowerManager power = activity.getSystemService(PowerManager.class);

@@ -427,6 +427,16 @@ public final class HomeActivity extends Activity {
     super.onPause();
   }
 
+  @Override public void onConfigurationChanged(android.content.res.Configuration configuration) {
+    super.onConfigurationChanged(configuration);
+    if (root != null) root.requestApplyInsets();
+  }
+
+  @Override protected void onStop() {
+    if (duoStatus != null) duoStatus.hostStopped();
+    super.onStop();
+  }
+
   private String label(App app) {
     return prefs.getString("name:" + app.id, app.label);
   }

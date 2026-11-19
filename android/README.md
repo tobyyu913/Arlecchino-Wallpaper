@@ -4,14 +4,14 @@ An independently implemented, minimalist Android launcher with the Arlecchino cu
 
 ## Install and setup
 
-Current source builds **Android 1.16.1** with `./scripts/build-android.sh`, producing `outputs/Arlecchino-Home-Android-1.16.1.apk`. Published APKs are available in [GitHub releases](https://github.com/tobyyu913/Arlecchino-Wallpaper/releases) and may be older than this branch. Requires Android 9 or later.
+Current source builds **Android 1.17** with `./scripts/build-android.sh`, producing `outputs/Arlecchino-Home-Android-1.17.apk`. Published APKs are available in [GitHub releases](https://github.com/tobyyu913/Arlecchino-Wallpaper/releases) and may be older than this branch. Requires Android 9 or later.
 
 1. Install the APK and open **Arlecchino Home**.
 2. Tap **Choose favorites** and select your home-screen apps.
 3. Tap **Make this your home screen** and confirm Arlecchino Home in Android's home-app picker.
 4. Tap **Enable curtain wallpaper** if the wallpaper is not already active, then confirm it in the system wallpaper picker.
 
-Version 1.16.1 updates the existing Arlecchino Wallpaper package using the same signing key. The old wallpaper-only APKs remain available in earlier releases. Installing this version does not automatically change the default launcher or grant notification access.
+Version 1.17 updates the existing Arlecchino Wallpaper package using the same signing key. The old wallpaper-only APKs remain available in earlier releases. Installing this version does not automatically change the default launcher or grant notification access.
 
 ## Home-screen workflow
 
@@ -47,8 +47,14 @@ The expanded layout uses connectivity/media tiles, circular utility controls and
 | Play/pause, previous/next | Sends supported transport actions to the active media session using existing optional notification access; unavailable actions are dimmed. |
 | Silent | Toggles normal/vibrate where Android permits it; otherwise opens Sound settings. |
 | Wi-Fi / mobile data / Bluetooth / airplane mode | Opens Android's actual connectivity panel or settings because ordinary modern Android apps cannot directly toggle these radios. |
-| Focus / battery / cast / display | Opens the corresponding working Android system settings. |
+| Low Power | Switches real Android Battery Saver on/off inside the panel using optional Shizuku access. The button confirms the actual PowerManager state. Charging/device-policy restrictions are reported without faking a successful switch. |
+| Automatic brightness | Switches adaptive/manual brightness directly after Modify system settings access. |
+| Focus | Switches Arlecchino's Do Not Disturb mode after optional policy access. Android 15+ owns this as an app-specific mode; other active system modes remain independent. |
 | Timer / calculator / camera | Opens the corresponding installed app or system action; missing handlers fall back to Settings. |
+
+Version 1.17 reduces the grid width, softens its borders, removes nested radio outlines and settings-only filler tiles, and keeps the original monochrome symbols. Opening reveals the panel from the status corner at nearly full text scale; it no longer shrinks the whole menu into a tiny thumbnail. The Low Power pill has a live amber enabled state. UI-mode changes caused by Battery Saver are handled without recreating the launcher.
+
+For the Low Power switch, install/start [Shizuku](https://shizuku.rikka.app/), then allow Arlecchino Home when Shizuku asks. No root is needed: the optional user service runs with the shell identity and exposes only a fixed Battery Saver operation, not arbitrary command strings. Access can be revoked in Shizuku. Start Shizuku again after a reboot. The switch keeps the menu open through permission/operation handoff and shows pending state until Android confirms the result. While charging, unplug first if Android disallows Battery Saver.
 
 The close button dismisses the panel; no nonfunctional power-off control is presented. Special permissions remain optional and are never enabled automatically on a physical phone.
 
@@ -86,7 +92,7 @@ Install JDK 17, Android SDK platform 35, and build-tools 34.0.0, then run:
 ./scripts/build-android.sh
 ```
 
-The script uses Android SDK tools directly without Gradle or third-party runtime libraries. Set `ANDROID_HOME` for another SDK path, `JAVA_HOME` for JDK 17, or `ANDROID_BUILD_TOOLS` / `ANDROID_PLATFORM_JAR` to override SDK versions.
+The script uses Android SDK tools directly without Gradle. Shizuku API/provider/aidl/shared 13.1.5 dependencies are fetched from Maven Central into the ignored build cache with pinned SHA-256 checksums from `android/dependencies.json`. Their MIT license is included in the source and APK. The launcher makes no runtime internet requests. Set `ANDROID_HOME` for another SDK path, `JAVA_HOME` for JDK 17, or `ANDROID_BUILD_TOOLS` / `ANDROID_PLATFORM_JAR` to override SDK versions.
 
 A private signing key is generated in ignored `work/android-signing/` on the first build. Back that directory up privately; do not publish it. Compatible updates must use the same signing key. A build with a different key cannot update an existing installation without uninstalling it.
 
@@ -99,7 +105,7 @@ java -cp work/android-tests com.tobyyu.arlecchinowallpaper.WakeCycleTest
 java -cp work/android-tests com.tobyyu.arlecchinowallpaper.AppIndexTest
 ```
 
-Run `./scripts/test-android-music.sh EMULATOR_SERIAL [ADB_PORT]` on a disposable emulator for real MediaSession callback/transport tests. It refuses physical devices because it grants notification access for synthetic test sessions. Pass `TransitionTests` as a third argument to check intermediate departure frames, synchronized fades, quick-release settling and canceling back to favorites. The music tests cover title/artist updates, play/pause, previous/next, resume, active-player changes and destroyed sessions. `NavigationTests` checks edge reservations, native Back, search dismissal, cancellation, Home and Recents. `DuoStatusTests` checks live battery data, expansion, native-bar hiding/restoration, background cleanup and returning Home. `ControlCenterTests` exercises actual volume/brightness/rotation changes, media transport commands, native Back dismissal, system-panel handoff and cleanup. These suites are emulator-only; the status suite temporarily sets and then resets an emulator battery fixture.
+Run `./scripts/test-android-music.sh EMULATOR_SERIAL [ADB_PORT]` on a disposable emulator for real MediaSession callback/transport tests. It refuses physical devices because it grants notification access for synthetic test sessions. Pass `TransitionTests` as a third argument to check intermediate departure frames, synchronized fades, quick-release settling and canceling back to favorites. The music tests cover title/artist updates, play/pause, previous/next, resume, active-player changes and destroyed sessions. `NavigationTests` checks edge reservations, native Back, search dismissal, cancellation, Home and Recents. `DuoStatusTests` checks live battery data, expansion, native-bar hiding/restoration, background cleanup and returning Home. `BatterySaverTests`, with official Shizuku running on the disposable emulator and an unplugged battery fixture, checks real Battery Saver on/off, permission handoff and retaining the panel. `ControlCenterTests` exercises actual volume/brightness/rotation changes, media transport commands, native Back dismissal, system-panel handoff and cleanup. These suites are emulator-only; the status suite temporarily sets and then resets an emulator battery fixture.
 
 Wake tests cover missed/duplicate/rapid wake events, decode cancellation, replaced surfaces, timeouts, and returning home. App-index tests cover sorting and search.
 
