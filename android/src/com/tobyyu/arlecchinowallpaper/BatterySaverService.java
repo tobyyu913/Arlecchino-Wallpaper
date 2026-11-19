@@ -23,11 +23,26 @@ public final class BatterySaverService extends Binder {
     boolean enabled=data.readInt()!=0;
     String error="";
     try {
-      java.lang.Process process=new ProcessBuilder("/system/bin/cmd","power","set-mode",enabled?"1":"0").redirectErrorStream(true).start();
-      if(!process.waitFor(4,TimeUnit.SECONDS)){process.destroyForcibly();throw new IOException("Battery saver timed out");}
-      if(process.exitValue()!=0){byte[] buffer=new byte[1024];int count=process.getInputStream().read(buffer);error=count>0?new String(buffer,0,count,"UTF-8"):"Android rejected the change";}
-      process.getInputStream().close();process.getOutputStream().close();process.getErrorStream().close();
+      String nativeState=command("/system/bin/settings","get","system",BatterySaverState.XIAOMI_KEY).trim();
+      if("0".equals(nativeState)||"1".equals(nativeState)) {
+        if((enabled?"1":"0").equals(nativeState))error="";
+        else {
+          String output=command("/system/bin/content","call","--uri","content://com.miui.powercenter.powersaver","--method","changePowerMode","--extra","POWER_SAVE_MODE_OPEN:b:"+enabled);
+          if(output.contains("SecurityException")||output.contains("Permission Denial"))error="OEM_PERMISSION";
+          else if(output.contains("Error")||output.contains("Exception"))error="OEM_UNAVAILABLE";
+        }
+      } else command("/system/bin/cmd","power","set-mode",enabled?"1":"0");
     }catch(Exception failure){error=failure.getMessage()==null?"Battery saver unavailable":failure.getMessage();}
     reply.writeNoException();reply.writeString(error);return true;
+  }
+  private static String command(String... arguments) throws Exception {
+    java.lang.Process process=new ProcessBuilder(arguments).redirectErrorStream(true).start();
+    if(!process.waitFor(4,TimeUnit.SECONDS)){process.destroyForcibly();throw new IOException("Battery Saver timed out");}
+    ByteArrayOutputStream output=new ByteArrayOutputStream();byte[] buffer=new byte[1024];int count;
+    while((count=process.getInputStream().read(buffer))!=-1){if(output.size()<8192)output.write(buffer,0,Math.min(count,8192-output.size()));}
+    process.getInputStream().close();process.getOutputStream().close();process.getErrorStream().close();
+    String result=output.toString("UTF-8");
+    if(process.exitValue()!=0&&!result.contains("Permission Denial"))throw new IOException("Android rejected Battery Saver");
+    return result;
   }
 }

@@ -4,14 +4,14 @@ An independently implemented, minimalist Android launcher with the Arlecchino cu
 
 ## Install and setup
 
-Current source builds **Android 1.17** with `./scripts/build-android.sh`, producing `outputs/Arlecchino-Home-Android-1.17.apk`. Published APKs are available in [GitHub releases](https://github.com/tobyyu913/Arlecchino-Wallpaper/releases) and may be older than this branch. Requires Android 9 or later.
+Current source builds **Android 1.17.1** with `./scripts/build-android.sh`, producing `outputs/Arlecchino-Home-Android-1.17.1.apk`. Published APKs are available in [GitHub releases](https://github.com/tobyyu913/Arlecchino-Wallpaper/releases) and may be older than this branch. Requires Android 9 or later.
 
 1. Install the APK and open **Arlecchino Home**.
 2. Tap **Choose favorites** and select your home-screen apps.
 3. Tap **Make this your home screen** and confirm Arlecchino Home in Android's home-app picker.
 4. Tap **Enable curtain wallpaper** if the wallpaper is not already active, then confirm it in the system wallpaper picker.
 
-Version 1.17 updates the existing Arlecchino Wallpaper package using the same signing key. The old wallpaper-only APKs remain available in earlier releases. Installing this version does not automatically change the default launcher or grant notification access.
+Version 1.17.1 updates the existing Arlecchino Wallpaper package using the same signing key. The old wallpaper-only APKs remain available in earlier releases. Installing this version does not automatically change the default launcher or grant notification access.
 
 ## Home-screen workflow
 
@@ -47,14 +47,14 @@ The expanded layout uses connectivity/media tiles, circular utility controls and
 | Play/pause, previous/next | Sends supported transport actions to the active media session using existing optional notification access; unavailable actions are dimmed. |
 | Silent | Toggles normal/vibrate where Android permits it; otherwise opens Sound settings. |
 | Wi-Fi / mobile data / Bluetooth / airplane mode | Opens Android's actual connectivity panel or settings because ordinary modern Android apps cannot directly toggle these radios. |
-| Low Power | Switches real Android Battery Saver on/off inside the panel using optional Shizuku access. The button confirms the actual PowerManager state. Charging/device-policy restrictions are reported without faking a successful switch. |
+| Low Power | Uses optional Shizuku for stock Android Battery Saver. On HyperOS/MIUI it reads the native Xiaomi state and attempts the native provider. If Xiaomi signature permissions block that provider, it reports the restriction and offers an explicit handoff to Xiaomi’s own control; it does not report the stock Android flag as native success. |
 | Automatic brightness | Switches adaptive/manual brightness directly after Modify system settings access. |
 | Focus | Switches Arlecchino's Do Not Disturb mode after optional policy access. Android 15+ owns this as an app-specific mode; other active system modes remain independent. |
 | Timer / calculator / camera | Opens the corresponding installed app or system action; missing handlers fall back to Settings. |
 
 Version 1.17 reduces the grid width, softens its borders, removes nested radio outlines and settings-only filler tiles, and keeps the original monochrome symbols. Opening reveals the panel from the status corner at nearly full text scale; it no longer shrinks the whole menu into a tiny thumbnail. The Low Power pill has a live amber enabled state. UI-mode changes caused by Battery Saver are handled without recreating the launcher.
 
-For the Low Power switch, install/start [Shizuku](https://shizuku.rikka.app/), then allow Arlecchino Home when Shizuku asks. No root is needed: the optional user service runs with the shell identity and exposes only a fixed Battery Saver operation, not arbitrary command strings. Access can be revoked in Shizuku. Start Shizuku again after a reboot. The switch keeps the menu open through permission/operation handoff and shows pending state until Android confirms the result. While charging, unplug first if Android disallows Battery Saver.
+For the Low Power switch, install/start [Shizuku](https://shizuku.rikka.app/), then allow Arlecchino Home when Shizuku asks. No root is needed: the optional user service runs with the shell identity and exposes only a fixed Battery Saver operation, not arbitrary command strings. Access can be revoked in Shizuku. Start Shizuku again after a reboot. The switch keeps the menu open through permission/operation handoff and shows pending state until the relevant native state confirms the result. HyperOS can block its native switch even from shell/Shizuku; this cannot be fixed by granting ordinary Shizuku access. Version 1.17.1 corrects the previous false success when Android’s separate low_power flag was on but Xiaomi’s POWER_SAVE_MODE_OPEN remained off. While charging, unplug first if Android disallows Battery Saver.
 
 The close button dismisses the panel; no nonfunctional power-off control is presented. Special permissions remain optional and are never enabled automatically on a physical phone.
 

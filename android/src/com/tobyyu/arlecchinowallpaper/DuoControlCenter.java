@@ -116,7 +116,7 @@ final class DuoControlCenter extends Dialog {
     brightness=new LevelSlider("sun","Brightness",true);volume=new LevelSlider("volume","Volume",false);middle.addView(brightness,new LinearLayout.LayoutParams(0,dp(156),1));gap(middle,12);middle.addView(volume,new LinearLayout.LayoutParams(0,dp(156),1));body.addView(middle);gap(body,12);
     LinearLayout utilities=row();torch=button("torch","Flashlight",this::toggleTorch);addUtility(utilities,torch);addUtility(utilities,button("timer","Timer",()->open(AlarmClock.ACTION_SHOW_TIMERS)));addUtility(utilities,button("calculator","Calculator",()->launchCategory(Intent.CATEGORY_APP_CALCULATOR)));addUtility(utilities,button("camera","Camera",()->open(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)));body.addView(utilities);gap(body,12);
     LinearLayout extras=row();
-    batterySaver=button("battery","Battery Saver",()->batteryControl.set(!activity.getSystemService(PowerManager.class).isPowerSaveMode()));
+    batterySaver=button("battery","Battery Saver",()->batteryControl.set(!BatterySaverState.enabled(activity)));
     extras.addView(batterySaver,new LinearLayout.LayoutParams(0,dp(68),2));gap(extras,12);
     autoBrightness=button("auto","Automatic brightness",this::toggleAutoBrightness);extras.addView(autoBrightness,new LinearLayout.LayoutParams(0,dp(68),1));gap(extras,12);
     extras.addView(button("settings","System settings",()->open(Settings.ACTION_SETTINGS)),new LinearLayout.LayoutParams(0,dp(68),1));body.addView(extras);gap(body,18);
@@ -176,7 +176,7 @@ final class DuoControlCenter extends Dialog {
     rotation.active=Settings.System.getInt(activity.getContentResolver(),Settings.System.ACCELEROMETER_ROTATION,1)==0;
     silent.active=audio!=null&&audio.getRingerMode()!=AudioManager.RINGER_MODE_NORMAL;focus.active=notifications!=null&&notifications.getCurrentInterruptionFilter()!=NotificationManager.INTERRUPTION_FILTER_ALL;
     PowerManager power=activity.getSystemService(PowerManager.class);
-    batterySaver.active=power!=null&&power.isPowerSaveMode();batterySaver.setEnabled(!batteryControl.busy());
+    batterySaver.active=BatterySaverState.enabled(activity);batterySaver.setEnabled(!batteryControl.busy());
     batterySaver.setContentDescription("Battery Saver "+(batterySaver.active?"on":"off")+(batteryControl.busy()?", changing":""));
     autoBrightness.active=Settings.System.getInt(activity.getContentResolver(),Settings.System.SCREEN_BRIGHTNESS_MODE,0)==1;
     torch.active=torchOn;for(View tile:tiles)tile.invalidate();

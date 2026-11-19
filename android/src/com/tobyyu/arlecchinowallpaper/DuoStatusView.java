@@ -81,6 +81,7 @@ final class DuoStatusView extends View {
     filter.addAction(Intent.ACTION_TIME_TICK); filter.addAction(Intent.ACTION_TIME_CHANGED);
     filter.addAction(Intent.ACTION_TIMEZONE_CHANGED); filter.addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED);
     filter.addAction(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED);
+    filter.addAction("miui.intent.action.POWER_SAVE_MODE_CHANGED");
     filter.addAction(WifiManager.RSSI_CHANGED_ACTION); filter.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
     if (Build.VERSION.SDK_INT >= 33) activity.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED);
     else activity.registerReceiver(receiver, filter);
@@ -102,7 +103,7 @@ final class DuoStatusView extends View {
   private void refresh() {
     airplane = Settings.Global.getInt(activity.getContentResolver(), Settings.Global.AIRPLANE_MODE_ON, 0) != 0;
     PowerManager power = activity.getSystemService(PowerManager.class);
-    saver = power != null && power.isPowerSaveMode();
+    saver = BatterySaverState.enabled(activity);
     wifiConnected = false; wifiLevel = -1; mobileConnected = false;
     try {
       NetworkCapabilities active = connectivity == null ? null : connectivity.getNetworkCapabilities(connectivity.getActiveNetwork());

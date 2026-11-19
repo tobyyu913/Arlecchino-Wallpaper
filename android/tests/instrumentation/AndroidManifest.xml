@@ -1,10 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.tobyyu.arlecchinowallpaper.tests">
 <uses-sdk android:minSdkVersion="28" android:targetSdkVersion="35"/>
-<application android:label="Arlecchino music tests"/>
+<permission android:name="com.tobyyu.arlecchinowallpaper.tests.OEM_POWER" android:protectionLevel="signature"/>
+<application android:label="Arlecchino music tests"><provider android:name="com.tobyyu.arlecchinowallpaper.OemPowerProvider" android:authorities="com.miui.powercenter.powersaver" android:exported="true" android:permission="com.tobyyu.arlecchinowallpaper.tests.OEM_POWER"/></application>
 <instrumentation android:name="com.tobyyu.arlecchinowallpaper.MusicTests" android:targetPackage="com.tobyyu.arlecchinowallpaper"/>
 <instrumentation android:name="com.tobyyu.arlecchinowallpaper.TransitionTests" android:targetPackage="com.tobyyu.arlecchinowallpaper"/>
 <instrumentation android:name="com.tobyyu.arlecchinowallpaper.NavigationTests" android:targetPackage="com.tobyyu.arlecchinowallpaper"/>
 <instrumentation android:name="com.tobyyu.arlecchinowallpaper.DuoStatusTests" android:targetPackage="com.tobyyu.arlecchinowallpaper"/>
 <instrumentation android:name="com.tobyyu.arlecchinowallpaper.ControlCenterTests" android:targetPackage="com.tobyyu.arlecchinowallpaper"/>
 <instrumentation android:name="com.tobyyu.arlecchinowallpaper.BatterySaverTests" android:targetPackage="com.tobyyu.arlecchinowallpaper"/>
+<instrumentation android:name="com.tobyyu.arlecchinowallpaper.OemBatterySaverTests" android:targetPackage="com.tobyyu.arlecchinowallpaper"/>
 </manifest>

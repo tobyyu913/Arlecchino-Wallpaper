@@ -17,6 +17,8 @@ final class BatterySaverControl {
   private IBinder service;
   private boolean binding,closed,busy,permissionPending;
   private Boolean requested;
+  private AlertDialog errorDialog;
+  private String lastError="";
   private final Shizuku.UserServiceArgs args;
   private final ServiceConnection connection=new ServiceConnection(){
     @Override public void onServiceConnected(ComponentName name,IBinder binder){if(closed)return;service=binder;binding=false;execute();}
@@ -28,7 +30,7 @@ final class BatterySaverControl {
     if(result==PackageManager.PERMISSION_GRANTED)bind();else fail("Battery Saver needs the Shizuku access you choose to allow.");
   };
   BatterySaverControl(Activity activity,Runnable changed){this.activity=activity;this.changed=changed;
-    args=new Shizuku.UserServiceArgs(new ComponentName(activity,BatterySaverService.class)).daemon(false).processNameSuffix("battery_saver").version(1);
+    args=new Shizuku.UserServiceArgs(new ComponentName(activity,BatterySaverService.class)).daemon(false).processNameSuffix("battery_saver").version(2);
     Shizuku.addRequestPermissionResultListener(permission);
   }
   boolean awaitingPermission(){return permissionPending;}
@@ -52,7 +54,14 @@ final class BatterySaverControl {
   private void execute(){if(closed||requested==null)return;boolean target=requested;requested=null;IBinder binder=service;
     worker.execute(()->{String error="";Parcel data=Parcel.obtain(),reply=Parcel.obtain();try{data.writeInterfaceToken(BatterySaverService.DESCRIPTOR);data.writeInt(target?1:0);if(!binder.transact(BatterySaverService.SET,data,reply,0))throw new RemoteException("Unsupported service");reply.readException();error=reply.readString();}catch(Exception failure){error="Shizuku connection failed";}finally{reply.recycle();data.recycle();}final String message=error;ui.post(()->{if(closed)return;if(message!=null&&!message.isEmpty()){fail(message);return;}confirm(target,0);});});
   }
-  private void confirm(boolean target,int attempt){if(closed)return;PowerManager power=activity.getSystemService(PowerManager.class);if(power!=null&&power.isPowerSaveMode()==target){busy=false;changed.run();return;}if(attempt>=8){fail("Android did not change Battery Saver. Check charging or device policy.");return;}ui.postDelayed(()->confirm(target,attempt+1),250);}
-  private void fail(String message){if(closed)return;busy=false;binding=false;requested=null;changed.run();Toast.makeText(activity,message,Toast.LENGTH_LONG).show();}
-  void close(){closed=true;Shizuku.removeRequestPermissionResultListener(permission);ui.removeCallbacksAndMessages(null);try{Shizuku.unbindUserService(args,connection,true);}catch(RuntimeException ignored){}worker.shutdownNow();service=null;}
+  private void confirm(boolean target,int attempt){if(closed)return;PowerManager power=activity.getSystemService(PowerManager.class);if(BatterySaverState.enabled(activity)==target){busy=false;changed.run();return;}if(attempt>=8){fail("Android did not change Battery Saver. Check charging or device policy.");return;}ui.postDelayed(()->confirm(target,attempt+1),250);}
+  private void fail(String message){if(closed)return;busy=false;binding=false;requested=null;lastError=message;changed.run();
+    if(message.startsWith("OEM_")){
+      errorDialog=new AlertDialog.Builder(activity).setTitle("Xiaomi Battery Saver")
+        .setMessage("HyperOS protects its Battery Saver switch with a Xiaomi system permission. Shizuku cannot grant that permission on this phone. Its Battery Saver state has not been changed.")
+        .setPositiveButton("Open Xiaomi Battery Saver",(d,w)->{try{activity.startActivity(new Intent("com.miui.powercenter.POWER_SAVE").setPackage("com.miui.securitycenter"));}catch(ActivityNotFoundException ignored){activity.startActivity(new Intent(android.provider.Settings.ACTION_BATTERY_SAVER_SETTINGS));}})
+        .setNegativeButton("Cancel",null).create();errorDialog.show();
+    }else Toast.makeText(activity,message,Toast.LENGTH_LONG).show();
+  }
+  void close(){closed=true;if(errorDialog!=null)errorDialog.dismiss();Shizuku.removeRequestPermissionResultListener(permission);ui.removeCallbacksAndMessages(null);try{Shizuku.unbindUserService(args,connection,true);}catch(RuntimeException ignored){}worker.shutdownNow();service=null;}
 }
