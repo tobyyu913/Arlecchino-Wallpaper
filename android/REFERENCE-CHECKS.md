@@ -198,3 +198,10 @@ Removed the expanded control panel, Shizuku helper/provider/dependencies and pan
 Notification previews now open a launcher-local reader instead of immediately sending the content PendingIntent. Only the explicit labelled Open button follows that link; canceled links report unavailability without falling back to an arbitrary app launch. Expanded BigText, InboxStyle lines and MessagingStyle messages supplied by Android are retained without the previous launcher-imposed 240-character cut. Android or the originating app can still limit supplied content. Notifications without content intents remain readable.
 
 Native emulator tests verify the expanded formats, zero intent sends while reading/closing, and exactly one send after explicit Open. Tests use synthetic notifications, not private phone notifications.
+
+
+### Inline notifications, 1.21
+
+Notification text expands directly beneath the app name in the favorites/list row instead of opening a separate reader dialog. The list handles the extra height and scrolling. Open, Reply (when supplied), Dismiss and Collapse actions appear inline, and tapping the text toggles expansion. Opening the source app remains an explicit action. Expansion is keyed by app and notification identity, survives row rebinding, and resets for a replacement or removed notification. Expanded rows keep the app icon aligned at the top.
+
+Native emulator checks passed for full inline text, collapse, row rebinding and recycling, replacement/removal, notifications without content intents, and exactly one intent send only after explicit Open. Phone installation was not performed because wireless ADB was unavailable.

@@ -34,7 +34,7 @@ run(['zip','-q','-j',b/'base.apk',b/'dex/classes.dex'])
 run([tools/'zipalign','-f','4',b/'base.apk',b/'aligned.apk'])
 run([tools/'apksigner','sign','--ks',root/'work/android-signing/release.jks','--ks-key-alias','arlecchino','--ks-pass','file:'+str(root/'work/android-signing/password.txt'),'--out',b/'test.apk',b/'aligned.apk'])
 PY
-"${ADB[@]}" install --no-incremental -r outputs/Arlecchino-Home-Android-1.20.apk
+"${ADB[@]}" install --no-incremental -r outputs/Arlecchino-Home-Android-1.21.apk
 "${ADB[@]}" install --no-incremental -r "$BUILD/test.apk"
 if [[ "$SUITE" == NavigationTests ]]; then
     "${ADB[@]}" shell cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.gestural

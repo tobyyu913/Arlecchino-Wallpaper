@@ -26,6 +26,7 @@ public final class HomeActivity extends Activity {
   private final ExecutorService worker = Executors.newSingleThreadExecutor();
   private final List<App> apps = new ArrayList<>();
   private final List<Row> rows = new ArrayList<>();
+  private final Map<String, String> expandedNotifications = new HashMap<>();
   private final Set<String> favorites = new LinkedHashSet<>(), hidden = new HashSet<>();
   private final Map<String, Integer> sections = new HashMap<>();
   private final android.util.LruCache<String, Drawable> icons = new android.util.LruCache<>(192);
@@ -864,7 +865,7 @@ public final class HomeActivity extends Activity {
     HomeNotifications.Preview notification = HomeNotifications.latest(a.pkg);
     if (notification != null) {
       labels.add(notification.text);
-      actions.add(() -> showNotification(label(a), notification));
+      actions.add(() -> { expandedNotifications.put(a.id, notification.key); adapter.notifyDataSetChanged(); });
       if (notification.replyAction != null) {
         labels.add("Reply");
         actions.add(() -> reply(notification));
@@ -913,24 +914,57 @@ public final class HomeActivity extends Activity {
     sheet(label(a), labels, n -> actions.get(n).run());
   }
 
-  AlertDialog showNotification(String appName, HomeNotifications.Preview n) {
-    ScrollView scroll = new ScrollView(this);
-    TextView body = text(n.fullText, 16, INK);
-    body.setPadding(dp(24), dp(12), dp(24), dp(20));
-    body.setTextIsSelectable(true);
-    scroll.addView(body);
-    AlertDialog.Builder panel = new AlertDialog.Builder(this)
-        .setTitle(appName + " · Notification")
-        .setView(scroll)
-        .setNegativeButton("Close", null);
-    if (n.action != null) panel.setPositiveButton("Open " + appName, (d, w) -> {
+  void bindNotification(TextView preview, LinearLayout actions, String appId,
+      String appName, HomeNotifications.Preview n, String fallback) {
+    actions.removeAllViews();
+    boolean expanded = n != null && n.key.equals(expandedNotifications.get(appId));
+    if (!expanded) expandedNotifications.remove(appId);
+    preview.setVisibility(n != null || !fallback.isEmpty() ? View.VISIBLE : View.GONE);
+    preview.setMaxLines(expanded ? Integer.MAX_VALUE : 3);
+    preview.setText(n == null ? fallback : expanded ? n.fullText : n.text);
+    preview.setContentDescription(n == null ? fallback : (expanded ? "Notification from " : "Expand notification from ") + appName + ". " + preview.getText());
+    preview.setOnClickListener(n == null ? null : v -> {
+      if (expanded) expandedNotifications.remove(appId);
+      else expandedNotifications.put(appId, n.key);
+      bindNotification(preview, actions, appId, appName, n, fallback);
+    });
+    preview.setClickable(n != null);
+    actions.setVisibility(expanded ? View.VISIBLE : View.GONE);
+    if (preview.getParent() instanceof LinearLayout) {
+      android.view.ViewParent row = ((LinearLayout) preview.getParent()).getParent();
+      if (row instanceof LinearLayout) ((LinearLayout) row).setGravity(expanded ? Gravity.TOP : Gravity.CENTER_VERTICAL);
+    }
+    if (!expanded) return;
+    LinearLayout primary = new LinearLayout(this);
+    actions.addView(primary);
+    if (n.action != null) notificationAction(primary, "Open " + appName, () -> {
       try { n.action.send(); }
       catch (PendingIntent.CanceledException e) {
         Toast.makeText(this, "This notification is no longer available", Toast.LENGTH_SHORT).show();
       }
     });
-    if (n.replyAction != null) panel.setNeutralButton("Reply", (d, w) -> reply(n));
-    return panel.show();
+    if (n.replyAction != null) notificationAction(primary, "Reply", () -> reply(n));
+    if (primary.getChildCount() == 0) primary.setVisibility(View.GONE);
+    LinearLayout secondary = new LinearLayout(this);
+    actions.addView(secondary);
+    notificationAction(secondary, "Dismiss", () -> {
+      expandedNotifications.remove(appId);
+      HomeNotifications.dismiss(n.key);
+    });
+    notificationAction(secondary, "Collapse", () -> {
+      expandedNotifications.remove(appId);
+      bindNotification(preview, actions, appId, appName, n, fallback);
+    });
+  }
+
+  private void notificationAction(LinearLayout row, String label, Runnable action) {
+    TextView button = text(label, 13, ACCENT);
+    button.setGravity(Gravity.CENTER_VERTICAL);
+    button.setMinHeight(dp(48));
+    button.setPadding(0, 0, dp(8), 0);
+    button.setBackgroundResource(android.R.drawable.list_selector_background);
+    button.setOnClickListener(v -> action.run());
+    row.addView(button, new LinearLayout.LayoutParams(0, -2, 1));
   }
 
   private void reply(HomeNotifications.Preview n) {
@@ -1562,11 +1596,17 @@ public final class HomeActivity extends Activity {
         preview.setPadding(0, dp(2), 0, 0);
         preview.setMaxLines(3);
         words.addView(preview);
+        LinearLayout notificationActions = new LinearLayout(HomeActivity.this);
+        notificationActions.setOrientation(LinearLayout.VERTICAL);
+        words.addView(notificationActions);
         line.addView(words, new LinearLayout.LayoutParams(0, -2, 1));
       }
       ImageView icon = (ImageView) line.getChildAt(0);
       LinearLayout words = (LinearLayout) line.getChildAt(1);
       TextView name = (TextView) words.getChildAt(0), preview = (TextView) words.getChildAt(1);
+      LinearLayout notificationActions = (LinearLayout) words.getChildAt(2);
+      notificationActions.removeAllViews();
+      notificationActions.setVisibility(View.GONE);
       name.setTextSize(
           prefs.getInt("textSize", 1) == 0 ? 14 : prefs.getInt("textSize", 1) == 2 ? 19 : 16);
       name.setMaxLines(2);
@@ -1587,14 +1627,8 @@ public final class HomeActivity extends Activity {
       else icon.setTag(null);
       HomeNotifications.Preview n = HomeNotifications.latest(a.pkg);
       boolean recent = searching && search.getText().length() == 0;
-      preview.setVisibility(n != null || recent ? View.VISIBLE : View.GONE);
-      preview.setText(
-          n != null
-              ? n.text
-              : recent
-                  ? (prefs.getLong("last:" + a.id, 0) > 0 ? "Recently used" : "Recently installed")
-                  : "");
-      preview.setOnClickListener(n == null ? null : v -> showNotification(label(a), n));
+      bindNotification(preview, notificationActions, a.id, label(a), n,
+          recent ? (prefs.getLong("last:" + a.id, 0) > 0 ? "Recently used" : "Recently installed") : "");
 
       return line;
     }
